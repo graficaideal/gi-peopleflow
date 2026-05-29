@@ -1,10 +1,70 @@
 import { useState, useEffect } from 'react'
-import { Settings2, ListChecks, ShieldAlert } from 'lucide-react'
+import { Settings2, ListChecks, ShieldAlert, User, Check } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '../hooks/useAuth'
 import CriteriaSettings from '../components/settings/CriteriaSettings'
 import GeneralSettings from '../components/settings/GeneralSettings'
 
+function ProfileSection({ user, onSave }) {
+  const current = user?.user_metadata?.full_name ?? user?.email?.split('@')[0] ?? ''
+  const [name, setName]     = useState(current)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved]   = useState(false)
+  const [error, setError]   = useState('')
+
+  const handleSave = async () => {
+    if (!name.trim()) return
+    setSaving(true)
+    setError('')
+    try {
+      await onSave(name.trim())
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="st-card" style={{ padding: '2px 0' }}>
+      <div className="st-settings-field">
+        <label className="st-settings-label">Nome de apresentação</label>
+        <p className="st-settings-hint">
+          Aparece na saudação do Dashboard. Só afecta a sua conta.
+        </p>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            className="st-input"
+            style={{ width: 260 }}
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSave()}
+            placeholder="O seu nome"
+            autoComplete="name"
+          />
+          <button
+            className="st-save-btn"
+            onClick={handleSave}
+            disabled={saving || !name.trim()}
+          >
+            {saved
+              ? <><Check size={13} /> Guardado</>
+              : saving ? 'A guardar…' : 'Guardar'}
+          </button>
+        </div>
+        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 8 }}>
+          {user?.email}
+        </p>
+        {error && <p className="st-error" style={{ marginTop: 10 }}>{error}</p>}
+      </div>
+    </div>
+  )
+}
+
 export default function Settings() {
+  const { user, updateDisplayName } = useAuth()
   const [criteria, setCriteria]   = useState([])
   const [settings, setSettings]   = useState({})
   const [loading, setLoading]     = useState(true)
@@ -296,6 +356,22 @@ export default function Settings() {
         </div>
 
         {loadError && <p className="st-error" style={{ marginBottom: 24 }}>{loadError}</p>}
+
+        {/* ── Perfil ── */}
+        <div className="st-section" style={{ animationDelay: '0s' }}>
+          <div className="st-section-header">
+            <div className="st-section-icon" style={{ background: 'rgba(34,197,94,0.08)', color: '#16a34a' }}>
+              <User size={16} />
+            </div>
+            <div>
+              <div className="st-section-title">O Meu Perfil</div>
+              <div className="st-section-desc">
+                Nome de apresentação usado na saudação do Dashboard.
+              </div>
+            </div>
+          </div>
+          <ProfileSection user={user} onSave={updateDisplayName} />
+        </div>
 
         {/* ── Critérios ── */}
         <div className="st-section" style={{ animationDelay: '0s' }}>
