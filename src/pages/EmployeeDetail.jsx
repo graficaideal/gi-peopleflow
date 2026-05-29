@@ -95,7 +95,8 @@ export default function EmployeeDetail() {
   )
 
   const statusCfg = STATUS_CONFIG[employee.status] ?? STATUS_CONFIG.inactive
-  const manager = employee.manager ?? employees.find(e => e.id === employee.manager_id) ?? null
+  const rawManager = Array.isArray(employee.manager) ? (employee.manager[0] ?? null) : employee.manager
+  const manager = rawManager ?? employees.find(e => e.id === employee.manager_id) ?? null
 
   return (
     <div>
