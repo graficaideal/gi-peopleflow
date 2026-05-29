@@ -1,1 +1,6 @@
-export { useAuthContext as useAuth } from '../context/AuthContext'
+import { useAuthContext } from '../context/AuthContext'
+
+export function useAuth() {
+  const { user, loading, signIn, signOut } = useAuthContext()
+  return { user, loading, signIn, signOut }
+}
