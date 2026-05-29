@@ -298,32 +298,38 @@ export default function Evaluations() {
         }
 
         /* Group header */
+        .evl-group-block { margin-top: 16px; }
+        .evl-group-block:first-child { margin-top: 0; }
+
         .evl-group-header {
           display: flex;
           align-items: center;
-          gap: 8px;
-          padding: 20px 0 8px;
-          font-size: 11px;
+          gap: 10px;
+          padding: 9px 14px;
+          margin-bottom: 10px;
+          background: var(--color-hover);
+          border-radius: 9px;
+          border-left: 3px solid var(--color-accent);
+          font-size: 12px;
           font-weight: 700;
-          color: var(--color-text-muted);
+          color: var(--color-text);
+          letter-spacing: 0.2px;
           text-transform: uppercase;
-          letter-spacing: 0.7px;
-        }
-        .evl-group-header:first-child { padding-top: 0; }
-        .evl-group-sep {
-          flex: 1;
-          height: 1px;
-          background: var(--color-border);
         }
         .evl-group-count {
-          font-size: 10px;
+          font-size: 11px;
           font-weight: 600;
-          padding: 1px 7px;
+          padding: 2px 8px;
           border-radius: 20px;
-          background: var(--color-hover);
-          color: var(--color-text-muted);
+          background: rgba(224,203,75,0.18);
+          color: #a16207;
           letter-spacing: 0;
           text-transform: none;
+          margin-left: auto;
+        }
+        [data-theme='dark'] .evl-group-count {
+          background: rgba(224,203,75,0.12);
+          color: var(--color-accent);
         }
 
         /* View controls */
@@ -457,15 +463,14 @@ export default function Evaluations() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {grouped.map(group => (
-              <div key={group.key}>
+              <div key={group.key} className={group.label !== null ? 'evl-group-block' : ''}>
                 {group.label !== null && (
                   <div className="evl-group-header">
                     <span>{group.label}</span>
                     <span className="evl-group-count">{group.items.length}</span>
-                    <span className="evl-group-sep" />
                   </div>
                 )}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: group.label !== null ? 4 : 0 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {group.items.map((ev, i) => renderRow(ev, i))}
                 </div>
               </div>
