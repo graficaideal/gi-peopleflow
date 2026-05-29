@@ -162,7 +162,7 @@ export default function Login() {
             marginBottom: 36,
             textAlign: 'center',
           }}>
-            Aceda à sua conta
+            Gestão de Avaliação de Desempenho
           </p>
 
           {/* Email */}
