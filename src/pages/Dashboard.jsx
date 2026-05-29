@@ -211,14 +211,15 @@ export default function Dashboard() {
           opacity: 0.8;
         }
 
-        /* ── Main grid ── */
-        .db-main {
+        /* ── Panels row (cycle + distribution, equal height) ── */
+        .db-panels {
           display: grid;
-          grid-template-columns: 1fr 340px;
+          grid-template-columns: 1fr 1fr;
           gap: 14px;
-          align-items: start;
+          margin-bottom: 14px;
+          align-items: stretch;
         }
-        @media (max-width: 1000px) { .db-main { grid-template-columns: 1fr; } }
+        @media (max-width: 800px) { .db-panels { grid-template-columns: 1fr; } }
 
         /* ── Section cards ── */
         .db-card {
@@ -504,14 +505,97 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Main grid */}
-        <div className="db-main">
+        {/* Panels: Ciclo Ativo + Distribuição — same height */}
+        <div className="db-panels">
 
-          {/* Left: pending evaluations list */}
+          {/* Ciclo Ativo */}
           {loading ? (
-            <div className="db-skel" style={{ height: 320 }} />
+            <div className="db-skel" style={{ height: 180 }} />
           ) : (
-            <div className="db-card">
+            <div className="db-card" style={{ animationDelay: '0.1s' }}>
+              <div className="db-card-header">
+                <span className="db-card-title">Ciclo Ativo</span>
+                {activeCycle && (
+                  <Link
+                    to="/cycles"
+                    style={{ fontSize: 11, color: 'var(--color-accent)', fontWeight: 600, textDecoration: 'none' }}
+                  >
+                    Ver →
+                  </Link>
+                )}
+              </div>
+              {activeCycle ? (
+                <div className="db-cycle-body">
+                  <div className="db-cycle-name">{activeCycle.name}</div>
+                  <div className="db-cycle-type">{formatCycleType(activeCycle.type)}</div>
+                  <div className="db-progress-label">
+                    <span>Progresso</span>
+                    <span style={{ fontWeight: 600, color: 'var(--color-text)' }}>
+                      {activeCycle.submitted}/{activeCycle.total}
+                      <span style={{ fontWeight: 400 }}> ({cycleProgressPct}%)</span>
+                    </span>
+                  </div>
+                  <div className="db-progress-track">
+                    <div className="db-progress-fill" style={{ width: `${cycleProgressPct}%` }} />
+                  </div>
+                  {(activeCycle.start_date || activeCycle.end_date) && (
+                    <div className="db-cycle-dates">
+                      <Calendar size={12} />
+                      <span>{formatDate(activeCycle.start_date)} – {formatDate(activeCycle.end_date)}</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="db-no-cycle">
+                  Nenhum ciclo ativo.{' '}
+                  <Link to="/cycles" style={{ color: 'var(--color-accent)', fontWeight: 600, textDecoration: 'none' }}>
+                    Criar ciclo →
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Distribuição de Resultados */}
+          {loading ? (
+            <div className="db-skel" style={{ height: 180 }} />
+          ) : closedCycle?.distribution ? (
+            <div className="db-card" style={{ animationDelay: '0.15s' }}>
+              <div className="db-card-header">
+                <span className="db-card-title">Distribuição — {closedCycle.name}</span>
+              </div>
+              <div className="db-dist-body">
+                {closedCycle.distribution.map(({ score, label, count, pct }) => (
+                  <div key={score} className="db-dist-row">
+                    <div className="db-dist-label">{label}</div>
+                    <div className="db-dist-track">
+                      <div
+                        className="db-dist-fill"
+                        style={{ width: `${pct}%`, background: barColor(score), opacity: count === 0 ? 0.15 : 1 }}
+                      />
+                    </div>
+                    <div className="db-dist-count" style={{ color: count > 0 ? barColor(score) : 'var(--color-border)' }}>
+                      {count}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="db-card" style={{ animationDelay: '0.15s' }}>
+              <div className="db-card-header">
+                <span className="db-card-title">Distribuição de Resultados</span>
+              </div>
+              <div className="db-no-cycle">Sem ciclos fechados com dados.</div>
+            </div>
+          )}
+        </div>
+
+        {/* Pending evaluations — full width */}
+        {loading ? (
+          <div className="db-skel" style={{ height: 320 }} />
+        ) : (
+          <div className="db-card">
               <div className="db-card-header">
                 <span className="db-card-title">Avaliações Pendentes</span>
                 <span className={`db-card-count${pendingCount === 0 ? ' zero' : ''}`}>
@@ -572,99 +656,6 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Right column */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-            {/* Active cycle progress */}
-            {loading ? (
-              <div className="db-skel" style={{ height: 160 }} />
-            ) : (
-              <div className="db-card" style={{ animationDelay: '0.1s' }}>
-                <div className="db-card-header">
-                  <span className="db-card-title">Ciclo Ativo</span>
-                  {activeCycle && (
-                    <Link
-                      to="/cycles"
-                      style={{ fontSize: 11, color: 'var(--color-accent)', fontWeight: 600, textDecoration: 'none' }}
-                    >
-                      Ver →
-                    </Link>
-                  )}
-                </div>
-                {activeCycle ? (
-                  <div className="db-cycle-body">
-                    <div className="db-cycle-name">{activeCycle.name}</div>
-                    <div className="db-cycle-type">{formatCycleType(activeCycle.type)}</div>
-                    <div className="db-progress-label">
-                      <span>Progresso</span>
-                      <span style={{ fontWeight: 600, color: 'var(--color-text)' }}>
-                        {activeCycle.submitted}/{activeCycle.total}
-                        <span style={{ fontWeight: 400 }}> ({cycleProgressPct}%)</span>
-                      </span>
-                    </div>
-                    <div className="db-progress-track">
-                      <div
-                        className="db-progress-fill"
-                        style={{ width: `${cycleProgressPct}%` }}
-                      />
-                    </div>
-                    {(activeCycle.start_date || activeCycle.end_date) && (
-                      <div className="db-cycle-dates">
-                        <Calendar size={12} />
-                        <span>{formatDate(activeCycle.start_date)} – {formatDate(activeCycle.end_date)}</span>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="db-no-cycle">
-                    Nenhum ciclo ativo.{' '}
-                    <Link to="/cycles" style={{ color: 'var(--color-accent)', fontWeight: 600, textDecoration: 'none' }}>
-                      Criar ciclo →
-                    </Link>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Score distribution */}
-            {loading ? (
-              <div className="db-skel" style={{ height: 190 }} />
-            ) : closedCycle?.distribution ? (
-              <div className="db-card" style={{ animationDelay: '0.15s' }}>
-                <div className="db-card-header">
-                  <span className="db-card-title">Distribuição — {closedCycle.name}</span>
-                </div>
-                <div className="db-dist-body">
-                  {closedCycle.distribution.map(({ score, label, count, pct }) => (
-                    <div key={score} className="db-dist-row">
-                      <div className="db-dist-label">{label}</div>
-                      <div className="db-dist-track">
-                        <div
-                          className="db-dist-fill"
-                          style={{
-                            width: `${pct}%`,
-                            background: barColor(score),
-                            opacity: count === 0 ? 0.15 : 1,
-                          }}
-                        />
-                      </div>
-                      <div className="db-dist-count" style={{ color: count > 0 ? barColor(score) : 'var(--color-border)' }}>
-                        {count}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : !loading && !closedCycle && (
-              <div className="db-card" style={{ animationDelay: '0.15s' }}>
-                <div className="db-card-header">
-                  <span className="db-card-title">Distribuição de Resultados</span>
-                </div>
-                <div className="db-no-cycle">Sem ciclos fechados com dados.</div>
-              </div>
-            )}
-          </div>
-        </div>
       </div>
     </>
   )
