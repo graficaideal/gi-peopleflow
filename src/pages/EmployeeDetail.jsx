@@ -1,9 +1,55 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Pencil, Trash2, Building2, Users, UserCheck, X } from 'lucide-react'
+import { ArrowLeft, Pencil, Trash2, Building2, Users, UserCheck, X, History } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useEmployees } from '../hooks/useEmployees'
 import EmployeeForm from '../components/employees/EmployeeForm'
+import { formatDate, formatCycleType, scoreToLabel } from '../utils/formatters'
+import { EVALUATION_TYPE_LABELS } from '../lib/constants'
+
+// ── History helpers ──────────────────────────────────────────────────────────
+
+function scoreColor(v) {
+  const n = parseFloat(v)
+  if (isNaN(n)) return 'var(--color-text-muted)'
+  if (n <= 2) return '#e05252'
+  if (n <= 3) return '#ca8a04'
+  return '#16a34a'
+}
+
+function buildHistory(evaluations) {
+  const byCycle = {}
+  evaluations.forEach(ev => {
+    const cycle = Array.isArray(ev.cycle) ? ev.cycle[0] : ev.cycle
+    if (!cycle) return
+    if (!byCycle[cycle.id]) byCycle[cycle.id] = { cycle, evals: [] }
+    byCycle[cycle.id].evals.push(ev)
+  })
+
+  return Object.values(byCycle).map(({ cycle, evals }) => {
+    const avgByType = {}
+    const allScores = []
+    for (const type of ['self', 'peer', 'manager']) {
+      const scores = evals
+        .filter(e => e.type === type)
+        .flatMap(e => (e.answers ?? []).map(a => a.score).filter(Boolean))
+      if (scores.length) {
+        avgByType[type] = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
+        allScores.push(...scores)
+      }
+    }
+    const globalAvg = allScores.length
+      ? (allScores.reduce((a, b) => a + b, 0) / allScores.length).toFixed(1)
+      : null
+    return { cycle, avgByType, globalAvg }
+  }).sort((a, b) => {
+    const da = a.cycle.end_date ?? ''
+    const db = b.cycle.end_date ?? ''
+    return db.localeCompare(da)
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG = {
   active:        { label: 'Ativo',        cls: 'active' },
@@ -26,6 +72,8 @@ export default function EmployeeDetail() {
   const [editing, setEditing] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [history, setHistory] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(true)
 
   const fetchEmployee = useCallback(async () => {
     setLoading(true)
@@ -45,7 +93,25 @@ export default function EmployeeDetail() {
     setLoading(false)
   }, [id])
 
-  useEffect(() => { fetchEmployee() }, [fetchEmployee])
+  const fetchHistory = useCallback(async () => {
+    setHistoryLoading(true)
+    const { data } = await supabase
+      .from('pf_evaluations')
+      .select(`
+        id, type,
+        cycle:pf_evaluation_cycles(id, name, type, end_date),
+        answers:pf_evaluation_answers(score)
+      `)
+      .eq('evaluatee_id', id)
+      .eq('status', 'submitted')
+    setHistory(buildHistory(data ?? []))
+    setHistoryLoading(false)
+  }, [id])
+
+  useEffect(() => {
+    fetchEmployee()
+    fetchHistory()
+  }, [fetchEmployee, fetchHistory])
 
   const handleUpdate = async (values) => {
     await updateEmployee(id, values)
@@ -166,6 +232,163 @@ export default function EmployeeDetail() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Evaluation history */}
+      <div style={{ marginTop: 28 }}>
+        <style>{`
+          .eh-section-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--color-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-bottom: 12px;
+          }
+          .eh-card {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 10px;
+          }
+          .eh-card-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 13px 18px;
+            border-bottom: 1px solid var(--color-border);
+            flex-wrap: wrap;
+          }
+          .eh-cycle-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--color-text);
+            flex: 1;
+            min-width: 0;
+          }
+          .eh-cycle-type {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 20px;
+            background: var(--color-hover);
+            color: var(--color-text-muted);
+            white-space: nowrap;
+          }
+          .eh-cycle-date {
+            font-size: 11px;
+            color: var(--color-text-muted);
+            white-space: nowrap;
+          }
+          .eh-scores {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            divide-x: 1px solid var(--color-border);
+          }
+          .eh-score-cell {
+            padding: 14px 18px;
+            border-right: 1px solid var(--color-border);
+          }
+          .eh-score-cell:last-child { border-right: none; }
+          .eh-score-cell.eh-global {
+            background: rgba(0,0,0,0.015);
+          }
+          [data-theme='dark'] .eh-score-cell.eh-global {
+            background: rgba(255,255,255,0.02);
+          }
+          .eh-score-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--color-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+          }
+          .eh-score-value {
+            font-size: 22px;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 3px;
+          }
+          .eh-score-sublabel {
+            font-size: 11px;
+            font-weight: 500;
+          }
+          .eh-empty {
+            padding: 36px 18px;
+            text-align: center;
+            font-size: 13px;
+            color: var(--color-text-muted);
+          }
+          .eh-skeleton {
+            height: 110px;
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 12px;
+            margin-bottom: 10px;
+          }
+        `}</style>
+
+        <div className="eh-section-title">
+          <History size={13} />
+          Histórico de Avaliações
+        </div>
+
+        {historyLoading ? (
+          [1, 2].map(i => <div key={i} className="eh-skeleton" />)
+        ) : history.length === 0 ? (
+          <div className="eh-card">
+            <div className="eh-empty">Sem avaliações submetidas para este colaborador.</div>
+          </div>
+        ) : history.map(({ cycle, avgByType, globalAvg }) => (
+          <div key={cycle.id} className="eh-card">
+            <div className="eh-card-header">
+              <span className="eh-cycle-name">{cycle.name}</span>
+              <span className="eh-cycle-type">{formatCycleType(cycle.type)}</span>
+              {cycle.end_date && (
+                <span className="eh-cycle-date">{formatDate(cycle.end_date)}</span>
+              )}
+            </div>
+            <div className="eh-scores">
+              {['self', 'peer', 'manager'].map(type => (
+                <div key={type} className="eh-score-cell">
+                  <div className="eh-score-label">{EVALUATION_TYPE_LABELS[type]}</div>
+                  {avgByType[type] ? (
+                    <>
+                      <div className="eh-score-value" style={{ color: scoreColor(avgByType[type]) }}>
+                        {avgByType[type]}
+                      </div>
+                      <div className="eh-score-sublabel" style={{ color: scoreColor(avgByType[type]) }}>
+                        {scoreToLabel(avgByType[type])}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="eh-score-value" style={{ color: 'var(--color-border)', fontSize: 16 }}>—</div>
+                  )}
+                </div>
+              ))}
+              <div className="eh-score-cell eh-global">
+                <div className="eh-score-label">Global</div>
+                {globalAvg ? (
+                  <>
+                    <div className="eh-score-value" style={{ color: scoreColor(globalAvg) }}>
+                      {globalAvg}
+                    </div>
+                    <div className="eh-score-sublabel" style={{ color: scoreColor(globalAvg) }}>
+                      {scoreToLabel(globalAvg)}
+                    </div>
+                  </>
+                ) : (
+                  <div className="eh-score-value" style={{ color: 'var(--color-border)', fontSize: 16 }}>—</div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Edit modal */}
