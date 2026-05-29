@@ -1,1 +1,1 @@
-// useAuth - to be implemented
+export { useAuthContext as useAuth } from '../context/AuthContext'
