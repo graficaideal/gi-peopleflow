@@ -95,6 +95,7 @@ export default function EmployeeDetail() {
   )
 
   const statusCfg = STATUS_CONFIG[employee.status] ?? STATUS_CONFIG.inactive
+  const manager = employee.manager ?? employees.find(e => e.id === employee.manager_id) ?? null
 
   return (
     <div>
@@ -153,12 +154,12 @@ export default function EmployeeDetail() {
           <div>
             <div className="empd-card-label">Superior hierárquico</div>
             <div className="empd-card-value">
-              {employee.manager ? (
+              {manager ? (
                 <Link
-                  to={`/employees/${employee.manager.id}`}
+                  to={`/employees/${manager.id}`}
                   style={{ color: 'var(--color-accent)', fontWeight: 600 }}
                 >
-                  {employee.manager.full_name}
+                  {manager.full_name}
                 </Link>
               ) : '—'}
             </div>

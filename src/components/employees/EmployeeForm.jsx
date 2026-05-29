@@ -43,7 +43,7 @@ export default function EmployeeForm({ title, initialValues = {}, employees = []
     setError('')
     setSaving(true)
     const payload = {
-      employee_number: vals.employee_number.trim(),
+      employee_number: vals.employee_number.trim().padStart(4, '0'),
       full_name:       vals.full_name.trim(),
       role:            vals.role.trim() || null,
       department_id:   vals.department_id || null,
@@ -75,6 +75,10 @@ export default function EmployeeForm({ title, initialValues = {}, employees = []
                 className="ui-input"
                 value={vals.employee_number}
                 onChange={set('employee_number')}
+                onBlur={e => {
+                  const v = e.target.value.trim()
+                  if (v) setVals(prev => ({ ...prev, employee_number: v.padStart(4, '0') }))
+                }}
                 placeholder="001"
                 autoFocus
               />
