@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { ClipboardList, ChevronRight } from 'lucide-react'
+import { ClipboardList, ChevronRight, EyeOff, Eye } from 'lucide-react'
 import { useEvaluations } from '../hooks/useEvaluations'
 import { useCycles } from '../hooks/useCycles'
 import { EvaluationTypeBadge, EvaluationStatusBadge } from '../components/evaluations/EvaluationBadge'
@@ -26,14 +26,24 @@ export default function Evaluations() {
   const [cycleFilter, setCycleFilter]   = useState('all')
   const [typeFilter, setTypeFilter]     = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [hideSubmitted, setHideSubmitted] = useState(
+    () => localStorage.getItem('pf_hide_submitted') === 'true'
+  )
+
+  const toggleHideSubmitted = () => {
+    const next = !hideSubmitted
+    setHideSubmitted(next)
+    localStorage.setItem('pf_hide_submitted', String(next))
+  }
 
   const filtered = useMemo(() => {
     let list = evaluations
     if (cycleFilter !== 'all') list = list.filter(e => e.cycle_id === cycleFilter)
     if (typeFilter !== 'all') list = list.filter(e => e.type === typeFilter)
     if (statusFilter !== 'all') list = list.filter(e => e.status === statusFilter)
+    if (hideSubmitted) list = list.filter(e => e.status !== 'submitted')
     return list
-  }, [evaluations, cycleFilter, typeFilter, statusFilter])
+  }, [evaluations, cycleFilter, typeFilter, statusFilter, hideSubmitted])
 
   const pending   = useMemo(() => evaluations.filter(e => e.status === 'pending').length, [evaluations])
   const submitted = useMemo(() => evaluations.filter(e => e.status === 'submitted').length, [evaluations])
@@ -207,6 +217,31 @@ export default function Evaluations() {
           border-radius: 6px;
           padding: 7px 11px;
         }
+
+        .evl-hide-btn {
+          height: 30px;
+          padding: 0 11px;
+          border-radius: 7px;
+          font-size: 12px;
+          font-weight: 500;
+          font-family: 'Outfit', sans-serif;
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          cursor: pointer;
+          border: 1px solid var(--color-border);
+          background: transparent;
+          color: var(--color-text-muted);
+          transition: background 0.15s, color 0.15s, border-color 0.15s;
+          white-space: nowrap;
+          margin-left: auto;
+        }
+        .evl-hide-btn:hover { background: var(--color-hover); color: var(--color-text); }
+        .evl-hide-btn.active {
+          background: rgba(234,179,8,0.08);
+          border-color: rgba(234,179,8,0.3);
+          color: #a16207;
+        }
       `}</style>
 
       <div>
@@ -262,6 +297,14 @@ export default function Evaluations() {
                 </button>
               ))}
             </div>
+
+            <button
+              className={`evl-hide-btn${hideSubmitted ? ' active' : ''}`}
+              onClick={toggleHideSubmitted}
+            >
+              {hideSubmitted ? <Eye size={12} /> : <EyeOff size={12} />}
+              {hideSubmitted ? 'Mostrar submetidas' : 'Ocultar submetidas'}
+            </button>
           </div>
         )}
 
