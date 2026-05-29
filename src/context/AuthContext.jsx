@@ -13,16 +13,8 @@ export function AuthProvider({ children }) {
       setLoading(false)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      const u = session?.user ?? null
-      setUser(u)
-      // Auto-populate full_name from email prefix on first sign-in
-      if (event === 'SIGNED_IN' && u && !u.user_metadata?.full_name && u.email) {
-        const { data } = await supabase.auth.updateUser({
-          data: { full_name: u.email.split('@')[0] },
-        })
-        if (data?.user) setUser(data.user)
-      }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
     })
 
     return () => subscription.unsubscribe()
