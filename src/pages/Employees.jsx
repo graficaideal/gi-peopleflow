@@ -5,18 +5,32 @@ import { useEmployees } from '../hooks/useEmployees'
 import EmployeeTable from '../components/employees/EmployeeTable'
 import EmployeeForm from '../components/employees/EmployeeForm'
 
-function calcLastEvalScores(evaluations, cycleMap) {
+function calcEvalScores(evaluations, activeCycleId, closedCycleMap) {
   const byEvaluatee = {}
   evaluations.forEach(ev => {
     if (!byEvaluatee[ev.evaluatee_id]) byEvaluatee[ev.evaluatee_id] = []
     byEvaluatee[ev.evaluatee_id].push(ev)
   })
 
+  const avg = scores => (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
+
   const result = {}
   for (const [empId, evals] of Object.entries(byEvaluatee)) {
+    // Prefer active cycle if employee has submitted answers there
+    if (activeCycleId) {
+      const scores = evals
+        .filter(e => e.cycle_id === activeCycleId)
+        .flatMap(e => (e.answers ?? []).map(a => a.score).filter(Boolean))
+      if (scores.length) {
+        result[empId] = { avg: avg(scores), inProgress: true }
+        continue
+      }
+    }
+
+    // Fallback: most recent closed cycle with submissions
     const mostRecent = [...new Set(evals.map(e => e.cycle_id))]
-      .map(cid => cycleMap[cid])
-      .filter(Boolean)
+      .filter(cid => closedCycleMap[cid])
+      .map(cid => closedCycleMap[cid])
       .sort((a, b) => (b.end_date ?? '').localeCompare(a.end_date ?? ''))[0]
 
     if (!mostRecent) continue
@@ -25,8 +39,7 @@ function calcLastEvalScores(evaluations, cycleMap) {
       .filter(e => e.cycle_id === mostRecent.id)
       .flatMap(e => (e.answers ?? []).map(a => a.score).filter(Boolean))
 
-    if (scores.length)
-      result[empId] = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
+    if (scores.length) result[empId] = { avg: avg(scores), inProgress: false }
   }
   return result
 }
@@ -44,23 +57,27 @@ export default function Employees() {
 
   useEffect(() => {
     const loadScores = async () => {
-      const { data: cycles } = await supabase
-        .from('pf_evaluation_cycles')
-        .select('id, end_date')
-        .eq('status', 'closed')
+      const [activeRes, closedRes] = await Promise.all([
+        supabase.from('pf_evaluation_cycles').select('id').eq('status', 'active').maybeSingle(),
+        supabase.from('pf_evaluation_cycles').select('id, end_date').eq('status', 'closed'),
+      ])
 
-      if (!cycles?.length) return
+      const activeCycleId = activeRes.data?.id ?? null
+      const closedCycles  = closedRes.data ?? []
+      const cycleIds = [...(activeCycleId ? [activeCycleId] : []), ...closedCycles.map(c => c.id)]
+
+      if (!cycleIds.length) return
 
       const { data: evals } = await supabase
         .from('pf_evaluations')
         .select('evaluatee_id, cycle_id, answers:pf_evaluation_answers(score)')
-        .in('cycle_id', cycles.map(c => c.id))
+        .in('cycle_id', cycleIds)
         .eq('status', 'submitted')
 
       if (!evals?.length) return
 
-      const cycleMap = Object.fromEntries(cycles.map(c => [c.id, c]))
-      setLastEvalScores(calcLastEvalScores(evals, cycleMap))
+      const closedCycleMap = Object.fromEntries(closedCycles.map(c => [c.id, c]))
+      setLastEvalScores(calcEvalScores(evals, activeCycleId, closedCycleMap))
     }
     loadScores()
   }, [])

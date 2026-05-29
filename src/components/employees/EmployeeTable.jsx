@@ -41,7 +41,7 @@ export default function EmployeeTable({ employees, lastEvalScores = {}, onEdit, 
         <tbody>
           {employees.map((emp, i) => {
             const cfg = STATUS_CONFIG[emp.status] ?? STATUS_CONFIG.inactive
-            const avg = lastEvalScores[emp.id] ?? null
+            const avg = lastEvalScores[emp.id] ?? null   // { avg, inProgress } | null
             return (
               <tr
                 key={emp.id}
@@ -64,13 +64,26 @@ export default function EmployeeTable({ employees, lastEvalScores = {}, onEdit, 
                 </td>
                 <td>
                   {avg ? (
-                    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 5 }}>
-                      <span style={{ fontSize: 15, fontWeight: 700, color: scoreColor(avg), lineHeight: 1 }}>
-                        {avg}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4 }}>
+                        <span style={{ fontSize: 15, fontWeight: 700, color: scoreColor(avg.avg), lineHeight: 1 }}>
+                          {avg.avg}
+                        </span>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: scoreColor(avg.avg) }}>
+                          {scoreToLabel(avg.avg)}
+                        </span>
                       </span>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: scoreColor(avg) }}>
-                        {scoreToLabel(avg)}
-                      </span>
+                      {avg.inProgress && (
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 3,
+                          fontSize: 10, fontWeight: 600, color: '#a16207',
+                          background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.2)',
+                          padding: '1px 6px', borderRadius: 20, whiteSpace: 'nowrap',
+                        }}>
+                          <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#ca8a04', flexShrink: 0 }} />
+                          em curso
+                        </span>
+                      )}
                     </span>
                   ) : (
                     <span style={{ color: 'var(--color-border)', fontSize: 13 }}>—</span>
