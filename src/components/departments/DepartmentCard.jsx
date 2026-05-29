@@ -24,9 +24,6 @@ export default function DepartmentCard({
         </div>
         <div className="dept-info">
           <div className="dept-name">{dept.name}</div>
-          {dept.description && (
-            <div className="dept-desc">{dept.description}</div>
-          )}
         </div>
         <div className="dept-actions">
           <button

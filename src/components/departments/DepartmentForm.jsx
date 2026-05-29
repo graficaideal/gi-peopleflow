@@ -3,7 +3,6 @@ import { X } from 'lucide-react'
 
 export default function DepartmentForm({ title, initialValues = {}, onSubmit, onClose }) {
   const [name, setName] = useState(initialValues.name ?? '')
-  const [description, setDescription] = useState(initialValues.description ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -12,7 +11,7 @@ export default function DepartmentForm({ title, initialValues = {}, onSubmit, on
     setError('')
     setSaving(true)
     try {
-      await onSubmit({ name: name.trim(), description: description.trim() || null })
+      await onSubmit({ name: name.trim() })
       onClose()
     } catch (err) {
       setError(err.message)
@@ -37,15 +36,6 @@ export default function DepartmentForm({ title, initialValues = {}, onSubmit, on
               onKeyDown={e => e.key === 'Enter' && handleSubmit()}
               placeholder="Nome do departamento"
               autoFocus
-            />
-          </div>
-          <div className="dept-field">
-            <label>Descrição</label>
-            <textarea
-              className="dept-input dept-textarea"
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              placeholder="Descrição opcional…"
             />
           </div>
           {error && <p className="dept-error">{error}</p>}
