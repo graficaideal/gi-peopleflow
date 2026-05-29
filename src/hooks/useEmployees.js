@@ -12,7 +12,7 @@ export function useEmployees() {
     const { data, error: err } = await supabase
       .from('pf_employees')
       .select(`
-        id, employee_number, full_name, role, status,
+        id, employee_number, full_name, role, email, status,
         department_id, team_id, manager_id,
         department:pf_departments(id, name),
         team:pf_teams(id, name),

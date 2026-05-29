@@ -13,6 +13,7 @@ export default function EmployeeForm({ title, initialValues = {}, employees = []
   const [vals, setVals] = useState({
     employee_number: initialValues.employee_number ?? '',
     full_name:       initialValues.full_name ?? '',
+    email:           initialValues.email ?? '',
     role:            initialValues.role ?? '',
     department_id:   initialValues.department_id ?? '',
     team_id:         initialValues.team_id ?? '',
@@ -45,6 +46,7 @@ export default function EmployeeForm({ title, initialValues = {}, employees = []
     const payload = {
       employee_number: vals.employee_number.trim().padStart(4, '0'),
       full_name:       vals.full_name.trim(),
+      email:           vals.email.trim() || null,
       role:            vals.role.trim() || null,
       department_id:   vals.department_id || null,
       team_id:         vals.team_id || null,
@@ -110,6 +112,17 @@ export default function EmployeeForm({ title, initialValues = {}, employees = []
               value={vals.role}
               onChange={set('role')}
               placeholder="Ex: Cozinheiro, Chefe de Sala…"
+            />
+          </div>
+
+          <div className="ui-field">
+            <label>Email</label>
+            <input
+              type="email"
+              className="ui-input"
+              value={vals.email}
+              onChange={set('email')}
+              placeholder="nome@empresa.pt"
             />
           </div>
 

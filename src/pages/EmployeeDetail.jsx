@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Pencil, Trash2, Building2, Users, UserCheck, X, History } from 'lucide-react'
+import { ArrowLeft, Pencil, Trash2, Building2, Users, UserCheck, X, History, Mail } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useEmployees } from '../hooks/useEmployees'
 import EmployeeForm from '../components/employees/EmployeeForm'
@@ -146,8 +146,8 @@ export default function EmployeeDetail() {
       <BackLink />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div className="ui-skeleton" style={{ height: 108 }} />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
-          {[1, 2, 3].map(i => <div key={i} className="ui-skeleton" style={{ height: 72 }} />)}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+          {[1, 2, 3, 4].map(i => <div key={i} className="ui-skeleton" style={{ height: 72 }} />)}
         </div>
       </div>
     </div>
@@ -228,6 +228,25 @@ export default function EmployeeDetail() {
                 >
                   {manager.full_name}
                 </Link>
+              ) : '—'}
+            </div>
+          </div>
+        </div>
+        <div className="empd-card">
+          <div className="empd-card-icon" style={{ background: 'rgba(34,197,94,0.08)', color: '#16a34a' }}>
+            <Mail size={16} />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div className="empd-card-label">Email</div>
+            <div className="empd-card-value" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {employee.email ? (
+                <a
+                  href={`mailto:${employee.email}`}
+                  style={{ color: 'var(--color-accent)', fontWeight: 600 }}
+                  onClick={e => e.stopPropagation()}
+                >
+                  {employee.email}
+                </a>
               ) : '—'}
             </div>
           </div>
