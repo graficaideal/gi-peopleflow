@@ -5,6 +5,7 @@ import { useEvaluations } from '../hooks/useEvaluations'
 import { useCycles } from '../hooks/useCycles'
 import { EvaluationTypeBadge, EvaluationStatusBadge } from '../components/evaluations/EvaluationBadge'
 import { formatDate } from '../utils/formatters'
+import { EVALUATION_TYPE_LABELS } from '../lib/constants'
 
 const TYPE_FILTERS = [
   { value: 'all',     label: 'Todos' },
@@ -19,6 +20,33 @@ const STATUS_FILTERS = [
   { value: 'submitted', label: 'Submetidas' },
 ]
 
+const TYPE_ORDER = { self: 0, peer: 1, manager: 2 }
+
+function buildGroups(filtered, groupBy, getEvaluatee) {
+  if (groupBy === 'none') return [{ key: 'all', label: null, items: filtered }]
+
+  const map = {}
+  filtered.forEach(ev => {
+    let key, label
+    if (groupBy === 'employee') {
+      const evaluatee = getEvaluatee(ev)
+      key   = evaluatee?.id ?? 'unknown'
+      label = evaluatee?.full_name ?? '—'
+    } else {
+      key   = ev.type
+      label = EVALUATION_TYPE_LABELS[ev.type] ?? ev.type
+    }
+    if (!map[key]) map[key] = { key, label, items: [] }
+    map[key].items.push(ev)
+  })
+
+  return Object.values(map).sort((a, b) =>
+    groupBy === 'type'
+      ? (TYPE_ORDER[a.key] ?? 99) - (TYPE_ORDER[b.key] ?? 99)
+      : a.label.localeCompare(b.label, 'pt')
+  )
+}
+
 export default function Evaluations() {
   const { evaluations, loading, error } = useEvaluations()
   const { cycles } = useCycles()
@@ -29,6 +57,9 @@ export default function Evaluations() {
   const [hideSubmitted, setHideSubmitted] = useState(
     () => localStorage.getItem('pf_hide_submitted') === 'true'
   )
+  const [groupBy, setGroupBy] = useState(
+    () => localStorage.getItem('pf_eval_group_by') ?? 'none'
+  )
 
   const toggleHideSubmitted = () => {
     const next = !hideSubmitted
@@ -36,17 +67,10 @@ export default function Evaluations() {
     localStorage.setItem('pf_hide_submitted', String(next))
   }
 
-  const filtered = useMemo(() => {
-    let list = evaluations
-    if (cycleFilter !== 'all') list = list.filter(e => e.cycle_id === cycleFilter)
-    if (typeFilter !== 'all') list = list.filter(e => e.type === typeFilter)
-    if (statusFilter !== 'all') list = list.filter(e => e.status === statusFilter)
-    if (hideSubmitted) list = list.filter(e => e.status !== 'submitted')
-    return list
-  }, [evaluations, cycleFilter, typeFilter, statusFilter, hideSubmitted])
-
-  const pending   = useMemo(() => evaluations.filter(e => e.status === 'pending').length, [evaluations])
-  const submitted = useMemo(() => evaluations.filter(e => e.status === 'submitted').length, [evaluations])
+  const setGroupByPersisted = (val) => {
+    setGroupBy(val)
+    localStorage.setItem('pf_eval_group_by', val)
+  }
 
   const isAnonymousPeer = (ev) =>
     ev.type === 'peer' && (Array.isArray(ev.cycle) ? ev.cycle[0] : ev.cycle)?.anonymous
@@ -57,13 +81,68 @@ export default function Evaluations() {
     return evaluator?.full_name ?? '—'
   }
 
-  const getEvaluatee = (ev) => {
-    const evaluatee = Array.isArray(ev.evaluatee) ? ev.evaluatee[0] : ev.evaluatee
-    return evaluatee
-  }
+  const getEvaluatee = (ev) =>
+    Array.isArray(ev.evaluatee) ? ev.evaluatee[0] : ev.evaluatee
 
-  const getCycle = (ev) => {
-    return Array.isArray(ev.cycle) ? ev.cycle[0] : ev.cycle
+  const getCycle = (ev) =>
+    Array.isArray(ev.cycle) ? ev.cycle[0] : ev.cycle
+
+  const filtered = useMemo(() => {
+    let list = evaluations
+    if (cycleFilter !== 'all') list = list.filter(e => e.cycle_id === cycleFilter)
+    if (typeFilter !== 'all') list = list.filter(e => e.type === typeFilter)
+    if (statusFilter !== 'all') list = list.filter(e => e.status === statusFilter)
+    if (hideSubmitted) list = list.filter(e => e.status !== 'submitted')
+    return list
+  }, [evaluations, cycleFilter, typeFilter, statusFilter, hideSubmitted])
+
+  const grouped = useMemo(
+    () => buildGroups(filtered, groupBy, getEvaluatee),
+    [filtered, groupBy]
+  )
+
+  const pending   = useMemo(() => evaluations.filter(e => e.status === 'pending').length, [evaluations])
+  const submitted = useMemo(() => evaluations.filter(e => e.status === 'submitted').length, [evaluations])
+
+  const renderRow = (ev, i) => {
+    const evaluatee   = getEvaluatee(ev)
+    const evaluatorName = getEvaluator(ev)
+    const cycle       = getCycle(ev)
+    return (
+      <Link
+        key={ev.id}
+        to={`/evaluations/${ev.id}`}
+        className="evl-row"
+        style={{ animationDelay: `${i * 0.03}s` }}
+      >
+        <div className="evl-main">
+          <div className="evl-top">
+            <span className="evl-name">{evaluatee?.full_name ?? '—'}</span>
+            {evaluatee?.employee_number && (
+              <span className="evl-number">#{evaluatee.employee_number}</span>
+            )}
+            <EvaluationTypeBadge type={ev.type} />
+            <EvaluationStatusBadge status={ev.status} />
+          </div>
+          <div className="evl-meta">
+            <span>Avaliador: {evaluatorName}</span>
+            {cycle?.name && (
+              <>
+                <span className="evl-meta-sep">·</span>
+                <span>{cycle.name}</span>
+              </>
+            )}
+            {ev.status === 'submitted' && ev.submitted_at && (
+              <>
+                <span className="evl-meta-sep">·</span>
+                <span>Submetida em {formatDate(ev.submitted_at)}</span>
+              </>
+            )}
+          </div>
+        </div>
+        <ChevronRight size={16} className="evl-arrow" />
+      </Link>
+    )
   }
 
   return (
@@ -218,6 +297,42 @@ export default function Evaluations() {
           padding: 7px 11px;
         }
 
+        /* Group header */
+        .evl-group-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 20px 0 8px;
+          font-size: 11px;
+          font-weight: 700;
+          color: var(--color-text-muted);
+          text-transform: uppercase;
+          letter-spacing: 0.7px;
+        }
+        .evl-group-header:first-child { padding-top: 0; }
+        .evl-group-sep {
+          flex: 1;
+          height: 1px;
+          background: var(--color-border);
+        }
+        .evl-group-count {
+          font-size: 10px;
+          font-weight: 600;
+          padding: 1px 7px;
+          border-radius: 20px;
+          background: var(--color-hover);
+          color: var(--color-text-muted);
+          letter-spacing: 0;
+          text-transform: none;
+        }
+
+        /* View controls */
+        .evl-view-controls {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-left: auto;
+        }
         .evl-hide-btn {
           height: 30px;
           padding: 0 11px;
@@ -234,7 +349,6 @@ export default function Evaluations() {
           color: var(--color-text-muted);
           transition: background 0.15s, color 0.15s, border-color 0.15s;
           white-space: nowrap;
-          margin-left: auto;
         }
         .evl-hide-btn:hover { background: var(--color-hover); color: var(--color-text); }
         .evl-hide-btn.active {
@@ -298,13 +412,27 @@ export default function Evaluations() {
               ))}
             </div>
 
-            <button
-              className={`evl-hide-btn${hideSubmitted ? ' active' : ''}`}
-              onClick={toggleHideSubmitted}
-            >
-              {hideSubmitted ? <Eye size={12} /> : <EyeOff size={12} />}
-              {hideSubmitted ? 'Mostrar submetidas' : 'Ocultar submetidas'}
-            </button>
+            {/* View controls — right-aligned */}
+            <div className="evl-view-controls">
+              <select
+                className="evl-cycle-select"
+                style={{ height: 30, fontSize: 12 }}
+                value={groupBy}
+                onChange={e => setGroupByPersisted(e.target.value)}
+              >
+                <option value="none">Sem agrupamento</option>
+                <option value="employee">Por colaborador</option>
+                <option value="type">Por tipo</option>
+              </select>
+
+              <button
+                className={`evl-hide-btn${hideSubmitted ? ' active' : ''}`}
+                onClick={toggleHideSubmitted}
+              >
+                {hideSubmitted ? <Eye size={12} /> : <EyeOff size={12} />}
+                {hideSubmitted ? 'Mostrar submetidas' : 'Ocultar submetidas'}
+              </button>
+            </div>
           </div>
         )}
 
@@ -327,47 +455,21 @@ export default function Evaluations() {
             <p style={{ fontSize: 13 }}>Tenta ajustar os filtros.</p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {filtered.map((ev, i) => {
-              const evaluatee = getEvaluatee(ev)
-              const evaluatorName = getEvaluator(ev)
-              const cycle = getCycle(ev)
-              return (
-                <Link
-                  key={ev.id}
-                  to={`/evaluations/${ev.id}`}
-                  className="evl-row"
-                  style={{ animationDelay: `${i * 0.03}s` }}
-                >
-                  <div className="evl-main">
-                    <div className="evl-top">
-                      <span className="evl-name">{evaluatee?.full_name ?? '—'}</span>
-                      {evaluatee?.employee_number && (
-                        <span className="evl-number">#{evaluatee.employee_number}</span>
-                      )}
-                      <EvaluationTypeBadge type={ev.type} />
-                      <EvaluationStatusBadge status={ev.status} />
-                    </div>
-                    <div className="evl-meta">
-                      <span>Avaliador: {evaluatorName}</span>
-                      {cycle?.name && (
-                        <>
-                          <span className="evl-meta-sep">·</span>
-                          <span>{cycle.name}</span>
-                        </>
-                      )}
-                      {ev.status === 'submitted' && ev.submitted_at && (
-                        <>
-                          <span className="evl-meta-sep">·</span>
-                          <span>Submetida em {formatDate(ev.submitted_at)}</span>
-                        </>
-                      )}
-                    </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {grouped.map(group => (
+              <div key={group.key}>
+                {group.label !== null && (
+                  <div className="evl-group-header">
+                    <span>{group.label}</span>
+                    <span className="evl-group-count">{group.items.length}</span>
+                    <span className="evl-group-sep" />
                   </div>
-                  <ChevronRight size={16} className="evl-arrow" />
-                </Link>
-              )
-            })}
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: group.label !== null ? 4 : 0 }}>
+                  {group.items.map((ev, i) => renderRow(ev, i))}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
