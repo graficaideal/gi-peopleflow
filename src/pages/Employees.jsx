@@ -1,8 +1,35 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Plus, Users, Search, X } from 'lucide-react'
+import { supabase } from '../lib/supabaseClient'
 import { useEmployees } from '../hooks/useEmployees'
 import EmployeeTable from '../components/employees/EmployeeTable'
 import EmployeeForm from '../components/employees/EmployeeForm'
+
+function calcLastEvalScores(evaluations, cycleMap) {
+  const byEvaluatee = {}
+  evaluations.forEach(ev => {
+    if (!byEvaluatee[ev.evaluatee_id]) byEvaluatee[ev.evaluatee_id] = []
+    byEvaluatee[ev.evaluatee_id].push(ev)
+  })
+
+  const result = {}
+  for (const [empId, evals] of Object.entries(byEvaluatee)) {
+    const mostRecent = [...new Set(evals.map(e => e.cycle_id))]
+      .map(cid => cycleMap[cid])
+      .filter(Boolean)
+      .sort((a, b) => (b.end_date ?? '').localeCompare(a.end_date ?? ''))[0]
+
+    if (!mostRecent) continue
+
+    const scores = evals
+      .filter(e => e.cycle_id === mostRecent.id)
+      .flatMap(e => (e.answers ?? []).map(a => a.score).filter(Boolean))
+
+    if (scores.length)
+      result[empId] = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
+  }
+  return result
+}
 
 const STATUS_FILTERS = [
   { value: null,            label: 'Todos' },
@@ -13,6 +40,30 @@ const STATUS_FILTERS = [
 
 export default function Employees() {
   const { employees, loading, error, createEmployee, updateEmployee, deleteEmployee } = useEmployees()
+  const [lastEvalScores, setLastEvalScores] = useState({})
+
+  useEffect(() => {
+    const loadScores = async () => {
+      const { data: cycles } = await supabase
+        .from('pf_evaluation_cycles')
+        .select('id, end_date')
+        .eq('status', 'closed')
+
+      if (!cycles?.length) return
+
+      const { data: evals } = await supabase
+        .from('pf_evaluations')
+        .select('evaluatee_id, cycle_id, answers:pf_evaluation_answers(score)')
+        .in('cycle_id', cycles.map(c => c.id))
+        .eq('status', 'submitted')
+
+      if (!evals?.length) return
+
+      const cycleMap = Object.fromEntries(cycles.map(c => [c.id, c]))
+      setLastEvalScores(calcLastEvalScores(evals, cycleMap))
+    }
+    loadScores()
+  }, [])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState(null)
   const [empModal, setEmpModal] = useState(null)      // null | { mode, emp }
@@ -121,6 +172,7 @@ export default function Employees() {
       ) : (
         <EmployeeTable
           employees={filtered}
+          lastEvalScores={lastEvalScores}
           onEdit={emp => setEmpModal({ mode: 'edit', emp })}
           onDelete={emp => { setDeleteError(''); setDeleteModal({ id: emp.id, name: emp.full_name }) }}
         />

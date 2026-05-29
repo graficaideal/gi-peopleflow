@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { Pencil, Trash2 } from 'lucide-react'
+import { scoreToLabel } from '../../utils/formatters'
 
 const STATUS_CONFIG = {
   active:        { label: 'Ativo',         cls: 'active' },
@@ -11,7 +12,15 @@ function initials(name) {
   return (name ?? '?').split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()
 }
 
-export default function EmployeeTable({ employees, onEdit, onDelete }) {
+function scoreColor(avg) {
+  const v = parseFloat(avg)
+  if (isNaN(v)) return 'var(--color-text-muted)'
+  if (v <= 2) return '#e05252'
+  if (v <= 3) return '#ca8a04'
+  return '#16a34a'
+}
+
+export default function EmployeeTable({ employees, lastEvalScores = {}, onEdit, onDelete }) {
   const navigate = useNavigate()
 
   return (
@@ -25,12 +34,14 @@ export default function EmployeeTable({ employees, onEdit, onDelete }) {
             <th>Departamento</th>
             <th>Equipa</th>
             <th>Estado</th>
+            <th>Última Avaliação</th>
             <th style={{ width: 72 }} />
           </tr>
         </thead>
         <tbody>
           {employees.map((emp, i) => {
             const cfg = STATUS_CONFIG[emp.status] ?? STATUS_CONFIG.inactive
+            const avg = lastEvalScores[emp.id] ?? null
             return (
               <tr
                 key={emp.id}
@@ -50,6 +61,20 @@ export default function EmployeeTable({ employees, onEdit, onDelete }) {
                 <td className="emp-cell-muted">{emp.team?.name ?? '—'}</td>
                 <td>
                   <span className={`emp-status ${cfg.cls}`}>{cfg.label}</span>
+                </td>
+                <td>
+                  {avg ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 5 }}>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: scoreColor(avg), lineHeight: 1 }}>
+                        {avg}
+                      </span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: scoreColor(avg) }}>
+                        {scoreToLabel(avg)}
+                      </span>
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--color-border)', fontSize: 13 }}>—</span>
+                  )}
                 </td>
                 <td onClick={e => e.stopPropagation()}>
                   <div className="emp-row-actions">
