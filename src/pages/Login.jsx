@@ -142,7 +142,7 @@ export default function Login() {
           <img
             src="/logo.svg"
             alt="GI"
-            style={{ width: 44, height: 'auto', display: 'block', marginBottom: 24 }}
+            style={{ width: 44, height: 'auto', display: 'block', margin: '0 auto 24px' }}
           />
 
           <h1 style={{
@@ -152,6 +152,7 @@ export default function Login() {
             letterSpacing: '-0.5px',
             marginBottom: 6,
             lineHeight: 1.2,
+            textAlign: 'center',
           }}>
             PeopleFlow
           </h1>
@@ -159,6 +160,7 @@ export default function Login() {
             fontSize: 14,
             color: 'rgba(255,255,255,0.38)',
             marginBottom: 36,
+            textAlign: 'center',
           }}>
             Aceda à sua conta
           </p>
