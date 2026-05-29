@@ -67,9 +67,6 @@ export default function DepartmentCard({
                 <span className="team-dot" />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="team-name">{team.name}</div>
-                  {team.description && (
-                    <div className="team-desc-text">{team.description}</div>
-                  )}
                 </div>
                 <div className="team-actions">
                   <button
