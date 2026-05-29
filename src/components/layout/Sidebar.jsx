@@ -31,7 +31,11 @@ export default function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-logo">GI</div>
+      <img
+        src="/logo.svg"
+        alt="GI"
+        style={{ width: 32, height: 'auto', marginBottom: 20, flexShrink: 0 }}
+      />
 
       <nav className="sidebar-nav">
         {NAV_ITEMS.map(({ to, icon: Icon, label, end }) => (
