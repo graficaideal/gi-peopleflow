@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { ClipboardList, ChevronRight, EyeOff, Eye } from 'lucide-react'
+import { ClipboardList, ChevronRight, EyeOff, Eye, Search, X } from 'lucide-react'
 import { useEvaluations } from '../hooks/useEvaluations'
 import { useCycles } from '../hooks/useCycles'
 import { EvaluationTypeBadge, EvaluationStatusBadge } from '../components/evaluations/EvaluationBadge'
@@ -54,6 +54,7 @@ export default function Evaluations() {
   const [cycleFilter, setCycleFilter]   = useState('all')
   const [typeFilter, setTypeFilter]     = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [search, setSearch] = useState('')
   const [hideSubmitted, setHideSubmitted] = useState(
     () => localStorage.getItem('pf_hide_submitted') === 'true'
   )
@@ -93,8 +94,16 @@ export default function Evaluations() {
     if (typeFilter !== 'all') list = list.filter(e => e.type === typeFilter)
     if (statusFilter !== 'all') list = list.filter(e => e.status === statusFilter)
     if (hideSubmitted) list = list.filter(e => e.status !== 'submitted')
+    if (search.trim()) {
+      const q = search.trim().toLowerCase()
+      list = list.filter(e => {
+        const ev = getEvaluatee(e)
+        return ev?.full_name?.toLowerCase().includes(q) ||
+               ev?.employee_number?.toLowerCase().includes(q)
+      })
+    }
     return list
-  }, [evaluations, cycleFilter, typeFilter, statusFilter, hideSubmitted])
+  }, [evaluations, cycleFilter, typeFilter, statusFilter, hideSubmitted, search])
 
   const grouped = useMemo(
     () => buildGroups(filtered, groupBy, getEvaluatee),
@@ -297,6 +306,51 @@ export default function Evaluations() {
           padding: 7px 11px;
         }
 
+        /* Search */
+        .evl-search {
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+        .evl-search-icon {
+          position: absolute;
+          left: 11px;
+          color: var(--color-text-muted);
+          pointer-events: none;
+          flex-shrink: 0;
+        }
+        .evl-search-input {
+          width: 100%;
+          height: 36px;
+          padding: 0 34px 0 34px;
+          border: 1px solid var(--color-border);
+          border-radius: 9px;
+          background: var(--color-surface);
+          color: var(--color-text);
+          font-size: 13px;
+          font-family: 'Outfit', sans-serif;
+          outline: none;
+          transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .evl-search-input:focus {
+          border-color: var(--color-accent);
+          box-shadow: 0 0 0 3px rgba(224,203,75,0.1);
+        }
+        .evl-search-input::placeholder { color: var(--color-text-muted); }
+        .evl-search-clear {
+          position: absolute;
+          right: 8px;
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--color-text-muted);
+          transition: background 0.15s, color 0.15s;
+        }
+        .evl-search-clear:hover { background: var(--color-hover); color: var(--color-text); }
+
         /* Group header */
         .evl-group-block { margin-top: 16px; }
         .evl-group-block:first-child { margin-top: 0; }
@@ -379,6 +433,26 @@ export default function Evaluations() {
             )}
           </div>
         </div>
+
+        {/* Search */}
+        {!loading && evaluations.length > 0 && (
+          <div style={{ marginBottom: 10 }}>
+            <div className="evl-search">
+              <Search size={14} className="evl-search-icon" />
+              <input
+                className="evl-search-input"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Pesquisar por colaborador…"
+              />
+              {search && (
+                <button className="evl-search-clear" onClick={() => setSearch('')}>
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Filters */}
         {!loading && evaluations.length > 0 && (
