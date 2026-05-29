@@ -12,11 +12,12 @@ import { SCORE_LABELS } from '../lib/constants'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function greeting() {
+function salutation(user) {
   const h = new Date().getHours()
-  if (h < 12) return 'Bom dia'
-  if (h < 20) return 'Boa tarde'
-  return 'Boa noite'
+  const period = h < 12 ? 'Bom dia' : h < 20 ? 'Boa tarde' : 'Boa noite'
+  const fullName = user?.user_metadata?.full_name ?? user?.email?.split('@')[0] ?? ''
+  const firstName = fullName.split(/\s+/)[0]
+  return firstName ? `${period}, ${firstName} 👋` : `${period} 👋`
 }
 
 function today() {
@@ -408,7 +409,7 @@ export default function Dashboard() {
         {/* Header */}
         <div style={{ marginBottom: 24 }}>
           <h1 className="page-title" style={{ marginBottom: 2 }}>
-            {greeting()}
+            {salutation(user)}
           </h1>
           <p className="page-subtitle" style={{ textTransform: 'capitalize' }}>
             {today()}
