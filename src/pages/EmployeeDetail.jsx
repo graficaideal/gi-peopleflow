@@ -232,25 +232,34 @@ export default function EmployeeDetail() {
             </div>
           </div>
         </div>
-        <div className="empd-card">
-          <div className="empd-card-icon" style={{ background: 'rgba(34,197,94,0.08)', color: '#16a34a' }}>
-            <Mail size={16} />
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <div className="empd-card-label">Email</div>
-            <div className="empd-card-value" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {employee.email ? (
-                <a
-                  href={`mailto:${employee.email}`}
-                  style={{ color: 'var(--color-accent)', fontWeight: 600 }}
-                  onClick={e => e.stopPropagation()}
-                >
-                  {employee.email}
-                </a>
-              ) : '—'}
+        {employee.email ? (
+          <a
+            className="empd-card"
+            href={`mailto:${employee.email}`}
+            title={employee.email}
+            style={{ textDecoration: 'none', cursor: 'pointer' }}
+          >
+            <div className="empd-card-icon" style={{ background: 'rgba(34,197,94,0.08)', color: '#16a34a' }}>
+              <Mail size={16} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div className="empd-card-label">Email</div>
+              <div className="empd-card-value" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--color-accent)', fontWeight: 600 }}>
+                {employee.email}
+              </div>
+            </div>
+          </a>
+        ) : (
+          <div className="empd-card">
+            <div className="empd-card-icon" style={{ background: 'rgba(34,197,94,0.08)', color: '#16a34a' }}>
+              <Mail size={16} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div className="empd-card-label">Email</div>
+              <div className="empd-card-value">—</div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Evaluation history */}
