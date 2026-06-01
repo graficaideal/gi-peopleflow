@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 
 export default function Login() {
@@ -7,8 +6,14 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { signIn } = useAuth()
-  const navigate = useNavigate()
+  const { signIn, accessDenied } = useAuth()
+
+  useEffect(() => {
+    if (accessDenied) {
+      setError('Não tens acesso ao PeopleFlow. Contacta o administrador.')
+      setLoading(false)
+    }
+  }, [accessDenied])
 
   const handleSignIn = async () => {
     if (!email || !password) return
@@ -16,11 +21,7 @@ export default function Login() {
     setLoading(true)
     const { error: err } = await signIn(email, password)
     setLoading(false)
-    if (err) {
-      setError(err.message)
-      return
-    }
-    navigate('/')
+    if (err) setError(err.message)
   }
 
   const handleKeyDown = (e) => {

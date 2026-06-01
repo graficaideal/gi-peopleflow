@@ -1,39 +1,75 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
+  // session: undefined=loading | null=no session | object=session
+  const [session, setSession] = useState(undefined)
+  // authorized: undefined=checking | null=no session | true=has peopleflow access
+  const [authorized, setAuthorized] = useState(undefined)
+  const [accessDenied, setAccessDenied] = useState(false)
 
+  // Effect 1: track raw auth state only
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      setLoading(false)
+      setSession(session ?? null)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+      setSession(session ?? null)
     })
 
     return () => subscription.unsubscribe()
   }, [])
 
-  const signIn = (email, password) => supabase.auth.signInWithPassword({ email, password })
-  const signOut = () => supabase.auth.signOut()
+  // Effect 2: verify peopleflow access whenever session changes
+  useEffect(() => {
+    if (session === undefined) return
 
-  const updateDisplayName = async (name) => {
-    const { data, error } = await supabase.auth.updateUser({ data: { full_name: name } })
-    if (error) throw error
-    setUser(data.user)
+    if (!session) {
+      setAuthorized(null)
+      return
+    }
+
+    setAuthorized(undefined) // checking…
+
+    supabase
+      .from('profiles')
+      .select('apps')
+      .eq('id', session.user.id)
+      .single()
+      .then(({ data }) => {
+        const allowed = data?.apps?.includes('peopleflow') ?? false
+        if (!allowed) {
+          setAccessDenied(true)
+          supabase.auth.signOut()
+          return
+        }
+        setAccessDenied(false)
+        setAuthorized(true)
+      })
+  }, [session])
+
+  async function signOut() {
+    await supabase.auth.signOut()
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signOut, updateDisplayName }}>
+    <AuthContext.Provider value={{
+      session,
+      authorized,
+      loading: authorized === undefined,
+      accessDenied,
+      signOut,
+    }}>
       {children}
     </AuthContext.Provider>
   )
 }
 
-export const useAuthContext = () => useContext(AuthContext)
+export function useAuth() {
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
+  return ctx
+}
