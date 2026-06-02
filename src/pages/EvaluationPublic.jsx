@@ -80,28 +80,17 @@ export default function EvaluationPublic() {
     setSubmitError('')
 
     const answers = Object.entries(scores).map(([criteria_id, score]) => ({
-      evaluation_id: evaluation.id,
       criteria_id,
-      score,
+      score: Number(score),
     }))
 
-    const { error: deleteErr } = await supabase
-      .from('pf_evaluation_answers')
-      .delete()
-      .eq('evaluation_id', evaluation.id)
-    if (deleteErr) { setSubmitError(deleteErr.message); setSaving(false); return }
+    const { error } = await supabase.rpc('submit_evaluation', {
+      p_token:   token,
+      p_answers: answers,
+      p_notes:   notes.trim() || null,
+    })
 
-    const { error: answersErr } = await supabase
-      .from('pf_evaluation_answers')
-      .upsert(answers, { onConflict: 'evaluation_id,criteria_id' })
-    if (answersErr) { setSubmitError(answersErr.message); setSaving(false); return }
-
-    const { error: evalErr } = await supabase
-      .from('pf_evaluations')
-      .update({ status: 'submitted', submitted_at: new Date().toISOString(), notes: notes.trim() || null, token: null })
-      .eq('id', evaluation.id)
-    if (evalErr) { setSubmitError(evalErr.message); setSaving(false); return }
-
+    if (error) { setSubmitError(error.message); setSaving(false); return }
     setPageState('success')
   }
 
