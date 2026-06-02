@@ -198,7 +198,7 @@ export default function Evaluations() {
         return et?.full_name?.toLowerCase().includes(q) || et?.employee_number?.toLowerCase().includes(q)
       })
     }
-    return list
+    return list.slice().sort((a, b) => (TYPE_ORDER[a.type] ?? 99) - (TYPE_ORDER[b.type] ?? 99))
   }, [evaluations, localChanges, cycleFilter, typeFilter, statusFilter, hideSubmitted, search])
 
   const grouped = useMemo(() => {
