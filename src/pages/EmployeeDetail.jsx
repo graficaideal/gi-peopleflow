@@ -84,7 +84,7 @@ export default function EmployeeDetail() {
         *,
         department:pf_departments(id, name),
         team:pf_teams(id, name),
-        manager:pf_employees!manager_id(id, full_name, employee_number),
+        manager:pf_employees!pf_employees_manager_id_fkey(id, full_name, employee_number),
         job_category:pf_job_categories(id, name)
       `)
       .eq('id', id)
