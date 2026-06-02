@@ -208,8 +208,7 @@ export default function Evaluations() {
     const isCompleted = es === 'submitted'
     const hasEmail   = !!getRecipient(ev)?.email
     const initials   = (evaluatee?.full_name ?? '?').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
-    const isAnon     = ev.type === 'peer' && (Array.isArray(ev.cycle) ? ev.cycle[0] : ev.cycle)?.anonymous
-    const evalName   = isAnon ? null : evaluator?.full_name ?? null
+    const evalName   = evaluator?.full_name ?? null
 
     return (
       <tr
