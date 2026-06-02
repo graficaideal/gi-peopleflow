@@ -30,7 +30,7 @@ export default function EmployeeForm({ title, initialValues = {}, employees = []
   const [error, setError] = useState('')
 
   useEffect(() => {
-    supabase.from('pf_job_categories').select('id, name').order('name').then(({ data }) => {
+    supabase.from('pf_job_categories').select('id, code, name').order('name').then(({ data }) => {
       setJobCategories(data ?? [])
     })
   }, [])
@@ -51,11 +51,14 @@ export default function EmployeeForm({ title, initialValues = {}, employees = []
 
   const managerOptions = employees.filter(e => e.id !== selfId)
 
-  const selectedCatLabel = jobCategories.find(c => c.id === vals.job_category_id)?.name ?? ''
-  const filteredCats = useMemo(
-    () => jobCategories.filter(c => c.name.toLowerCase().includes(catSearch.toLowerCase())),
-    [jobCategories, catSearch]
-  )
+  const catLabel = (c) => c.code ? `${c.code} — ${c.name}` : c.name
+  const selectedCatLabel = catLabel(jobCategories.find(c => c.id === vals.job_category_id) ?? {})
+  const filteredCats = useMemo(() => {
+    const q = catSearch.toLowerCase()
+    return jobCategories.filter(c =>
+      c.name.toLowerCase().includes(q) || c.code?.toLowerCase().includes(q)
+    )
+  }, [jobCategories, catSearch])
 
   const handleSubmit = async () => {
     if (!vals.full_name.trim() || !vals.employee_number.trim()) return
@@ -178,7 +181,7 @@ export default function EmployeeForm({ title, initialValues = {}, employees = []
                     onMouseEnter={e => { if (c.id !== vals.job_category_id) e.currentTarget.style.background = 'var(--color-hover)' }}
                     onMouseLeave={e => { if (c.id !== vals.job_category_id) e.currentTarget.style.background = 'transparent' }}
                   >
-                    {c.name}
+                    {catLabel(c)}
                   </div>
                 ))}
               </div>
