@@ -22,6 +22,17 @@ export default function EvaluationPublic() {
   const [submitError, setSubmitError] = useState('')
 
   const load = useCallback(async () => {
+    // Step 1: validate token and transition status via SECURITY DEFINER RPC
+    // (bypasses RLS — works even if anon UPDATE policy is missing)
+    const { error: rpcErr } = await supabase.rpc('open_evaluation_by_token', { p_token: token })
+    if (rpcErr) {
+      const msg = rpcErr.message ?? ''
+      if (msg.includes('expired'))           { setPageState('expired'); return }
+      if (msg.includes('already_submitted')) { setPageState('already_submitted'); return }
+      setPageState('invalid'); return
+    }
+
+    // Step 2: fetch full evaluation data for the form
     const [evalRes, criteriaRes] = await Promise.all([
       supabase
         .from('pf_evaluations')
@@ -39,20 +50,6 @@ export default function EvaluationPublic() {
     if (evalRes.error || !evalRes.data) { setPageState('invalid'); return }
 
     const ev = evalRes.data
-    if (ev.token_expires_at && new Date(ev.token_expires_at) < new Date()) {
-      setPageState('expired'); return
-    }
-    if (ev.status === 'submitted')  { setPageState('already_submitted'); return }
-    if (ev.status === 'cancelled')  { setPageState('invalid'); return }
-
-    if (ev.status === 'pending' || ev.status === 'sent') {
-      const { error: updateErr } = await supabase
-        .from('pf_evaluations')
-        .update({ status: 'opened' })
-        .eq('id', ev.id)
-      if (updateErr) { setPageState('invalid'); return }
-    }
-
     setEvaluation(ev)
     setCriteria(criteriaRes.data ?? [])
     setScores(Object.fromEntries((ev.answers ?? []).map(a => [a.criteria_id, a.score])))
