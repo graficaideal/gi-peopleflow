@@ -222,12 +222,12 @@ export default function EmployeeDetail() {
           <div>
             <div className="empd-card-label">Superior hierárquico</div>
             <div className="empd-card-value">
-              {manager ? (
+              {manager?.id ? (
                 <Link
                   to={`/employees/${manager.id}`}
                   style={{ color: 'var(--color-accent)', fontWeight: 600 }}
                 >
-                  {manager.full_name}
+                  {manager.full_name ?? '—'}
                 </Link>
               ) : '—'}
             </div>
