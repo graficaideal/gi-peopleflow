@@ -16,7 +16,6 @@ export function useEmployees() {
         department_id, team_id, manager_id, job_category_id,
         department:pf_departments(id, name),
         team:pf_teams(id, name),
-        manager:pf_employees!pf_employees_manager_id_fkey(id, full_name, employee_number),
         job_category:pf_job_categories(id, name)
       `)
       .order('full_name')

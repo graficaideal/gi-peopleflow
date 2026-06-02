@@ -67,6 +67,7 @@ export default function EmployeeDetail() {
   const { employees, updateEmployee, deleteEmployee } = useEmployees()
 
   const [employee, setEmployee] = useState(null)
+  const [manager, setManager] = useState(null)
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState(null)
   const [editing, setEditing] = useState(false)
@@ -84,13 +85,24 @@ export default function EmployeeDetail() {
         *,
         department:pf_departments(id, name),
         team:pf_teams(id, name),
-        manager:pf_employees!pf_employees_manager_id_fkey(id, full_name, employee_number),
         job_category:pf_job_categories(id, name)
       `)
       .eq('id', id)
       .single()
     if (error) { setFetchError(error.message); setLoading(false); return }
     setEmployee(data)
+
+    if (data.manager_id) {
+      const { data: mgr } = await supabase
+        .from('pf_employees')
+        .select('id, full_name, employee_number')
+        .eq('id', data.manager_id)
+        .single()
+      setManager(mgr ?? null)
+    } else {
+      setManager(null)
+    }
+
     setLoading(false)
   }, [id])
 
@@ -162,9 +174,6 @@ export default function EmployeeDetail() {
   )
 
   const statusCfg = STATUS_CONFIG[employee.status] ?? STATUS_CONFIG.inactive
-  const rawManager = Array.isArray(employee.manager) ? (employee.manager[0] ?? null) : employee.manager
-  const manager = (rawManager?.id ? rawManager : null)
-    ?? (employee.manager_id ? (employees.find(e => e.id === employee.manager_id) ?? null) : null)
 
   return (
     <div>
@@ -427,10 +436,10 @@ export default function EmployeeDetail() {
           title="Editar Colaborador"
           initialValues={{
             ...employee,
-            department_id:   employee.department?.id    ?? employee.department_id    ?? '',
-            team_id:         employee.team?.id          ?? employee.team_id          ?? '',
-            manager_id:      employee.manager?.id       ?? employee.manager_id       ?? '',
-            job_category_id: employee.job_category?.id  ?? employee.job_category_id ?? '',
+            department_id:   employee.department?.id   ?? employee.department_id   ?? '',
+            team_id:         employee.team?.id         ?? employee.team_id         ?? '',
+            manager_id:      employee.manager_id                                   ?? '',
+            job_category_id: employee.job_category?.id ?? employee.job_category_id ?? '',
           }}
           employees={employees}
           selfId={id}
