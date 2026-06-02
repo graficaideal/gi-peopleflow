@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, User, Users, UserCheck, Link2, Copy, Mail } from 'lucide-react'
+import { ArrowLeft, User, Users, UserCheck, Link2, Copy, Mail, X } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import EvaluationForm from '../components/evaluations/EvaluationForm'
 import EvaluationSummary from '../components/evaluations/EvaluationSummary'
@@ -20,6 +20,7 @@ export default function EvaluationDetail() {
   const [localToken, setLocalToken] = useState(null)
   const [generating, setGenerating] = useState(false)
   const [copied, setCopied]         = useState(false)
+  const [sendModal, setSendModal]   = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -51,11 +52,11 @@ export default function EvaluationDetail() {
         : null
       const { error: err } = await supabase
         .from('pf_evaluations')
-        .update({ token, token_expires_at: expiresAt, status: 'sent' })
+        .update({ token, token_expires_at: expiresAt })
         .eq('id', id)
       if (err) throw err
       setLocalToken(token)
-      setEvaluation(ev => ({ ...ev, token, token_expires_at: expiresAt, status: 'sent' }))
+      setEvaluation(ev => ({ ...ev, token, token_expires_at: expiresAt }))
     } catch (err) {
       console.error('Erro ao gerar token:', err)
     } finally {
@@ -71,20 +72,40 @@ export default function EvaluationDetail() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const handleSendEmail = () => {
+  const openMailto = () => {
     const token = localToken || evaluation?.token
     if (!token) return
     const link = `${EVAL_BASE_URL}/${token}`
     const endDate = cycle?.end_date
       ? new Date(cycle.end_date + 'T00:00:00').toLocaleDateString('pt-PT')
       : '—'
-    // Self-evaluation: send to the evaluatee; peer/manager: send to the evaluator
     const recipient = evaluation.type === 'self' ? evaluatee : evaluator
     const subject = encodeURIComponent(`Avaliação de Desempenho - ${evaluatee?.full_name ?? ''}`)
     const body = encodeURIComponent(
       `Olá ${recipient?.full_name ?? ''},\n\nFoi gerada a sua avaliação de desempenho referente ao ciclo ${cycle?.name ?? ''}. Por favor aceda ao link abaixo para preencher o questionário até ${endDate}.\n\n${link}`
     )
     window.open(`mailto:${recipient?.email ?? ''}?subject=${subject}&body=${body}`)
+  }
+
+  const handleSendEmail = () => setSendModal(true)
+
+  const handleConfirmMarkSent = async () => {
+    setSendModal(false)
+    try {
+      const { error: err } = await supabase
+        .from('pf_evaluations')
+        .update({ status: 'sent' })
+        .eq('id', id)
+      if (!err) setEvaluation(ev => ({ ...ev, status: 'sent' }))
+    } catch (err) {
+      console.error('Erro ao marcar como enviada:', err)
+    }
+    openMailto()
+  }
+
+  const handleSendWithoutMark = () => {
+    setSendModal(false)
+    openMailto()
   }
 
   const handleSubmit = async ({ scores, notes }) => {
@@ -553,6 +574,27 @@ export default function EvaluationDetail() {
           />
         )}
       </div>
+
+      {/* Send email confirmation modal */}
+      {sendModal && (
+        <div className="ui-modal-overlay" onClick={e => e.target === e.currentTarget && setSendModal(false)}>
+          <div className="ui-modal" style={{ maxWidth: 400 }}>
+            <div className="ui-modal-header">
+              <span className="ui-modal-title">Enviar avaliação</span>
+              <button className="ui-modal-close" onClick={() => setSendModal(false)}><X size={15} /></button>
+            </div>
+            <div className="ui-modal-body">
+              <p style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.6 }}>
+                Pretende marcar esta avaliação como <strong>enviada</strong>?
+              </p>
+            </div>
+            <div className="ui-modal-footer">
+              <button className="ui-btn secondary" onClick={handleSendWithoutMark}>Enviar sem marcar</button>
+              <button className="ui-btn primary" onClick={handleConfirmMarkSent}>Marcar como enviada</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
