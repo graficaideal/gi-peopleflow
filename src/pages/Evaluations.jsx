@@ -134,7 +134,7 @@ export default function Evaluations() {
     e.stopPropagation()
     if (busyIds.has(ev.id)) return
     let token = effToken(ev)
-    if (!token) { token = await generateToken(ev); if (!token) return }
+    if (!token) { token = await generateToken(ev, false); if (!token) return }
     const evaluatee = getEvaluatee(ev)
     const evaluator = getEvaluator(ev)
     const cycle     = getCycle(ev)
