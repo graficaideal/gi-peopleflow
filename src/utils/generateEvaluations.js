@@ -3,7 +3,7 @@ import { selectPeerEvaluators } from './evaluationAlgorithm'
 
 export async function generateEvaluationsForCycle(cycleId) {
   const [empResult, settingResult] = await Promise.all([
-    supabase.from('pf_employees').select('id, manager_id, team_id').eq('status', 'active'),
+    supabase.from('pf_employees').select('id, manager_id, team_id, department_id, department:pf_departments(area)').eq('status', 'active'),
     supabase.from('pf_settings').select('value').eq('key', 'peer_evaluator_limit').single(),
   ])
 

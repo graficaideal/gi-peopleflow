@@ -42,17 +42,22 @@ export default function EvaluationPublic() {
     if (ev.token_expires_at && new Date(ev.token_expires_at) < new Date()) {
       setPageState('expired'); return
     }
-    if (ev.status === 'submitted') { setPageState('already_submitted'); return }
+    if (ev.status === 'submitted')  { setPageState('already_submitted'); return }
+    if (ev.status === 'cancelled')  { setPageState('invalid'); return }
+    if (ev.status === 'pending')    { setPageState('invalid'); return }
+
+    if (ev.status === 'sent') {
+      const { error: updateErr } = await supabase
+        .from('pf_evaluations')
+        .update({ status: 'opened' })
+        .eq('id', ev.id)
+      if (updateErr) { setPageState('invalid'); return }
+    }
 
     setEvaluation(ev)
     setCriteria(criteriaRes.data ?? [])
     setScores(Object.fromEntries((ev.answers ?? []).map(a => [a.criteria_id, a.score])))
     setNotes(ev.notes ?? '')
-
-    if (ev.status === 'sent') {
-      await supabase.from('pf_evaluations').update({ status: 'opened' }).eq('id', ev.id)
-    }
-
     setPageState('form')
   }, [token])
 

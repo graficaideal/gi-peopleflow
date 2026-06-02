@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
+import { DEPARTMENT_AREAS, DEPARTMENT_AREA_LABELS } from '../../lib/constants'
 
 export default function DepartmentForm({ title, initialValues = {}, onSubmit, onClose }) {
   const [name, setName] = useState(initialValues.name ?? '')
+  const [area, setArea] = useState(initialValues.area ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -11,7 +13,7 @@ export default function DepartmentForm({ title, initialValues = {}, onSubmit, on
     setError('')
     setSaving(true)
     try {
-      await onSubmit({ name: name.trim() })
+      await onSubmit({ name: name.trim(), area: area || null })
       onClose()
     } catch (err) {
       setError(err.message)
@@ -37,6 +39,19 @@ export default function DepartmentForm({ title, initialValues = {}, onSubmit, on
               placeholder="Nome do departamento"
               autoFocus
             />
+          </div>
+          <div className="dept-field">
+            <label>Área</label>
+            <select
+              className="dept-input"
+              value={area}
+              onChange={e => setArea(e.target.value)}
+            >
+              <option value="">— Sem área —</option>
+              {Object.values(DEPARTMENT_AREAS).map(v => (
+                <option key={v} value={v}>{DEPARTMENT_AREA_LABELS[v]}</option>
+              ))}
+            </select>
           </div>
           {error && <p className="dept-error">{error}</p>}
         </div>

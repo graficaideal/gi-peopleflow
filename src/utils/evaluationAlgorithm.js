@@ -1,19 +1,30 @@
-/**
- * Randomly selects peer evaluators for a given employee.
- * Excludes the employee themselves and their direct manager.
- *
- * @param {object} employee - The employee being evaluated
- * @param {array} allEmployees - All employees in the same team/department
- * @param {number} limit - Max number of peer evaluators to assign
- * @returns {array} - Selected evaluators
- */
+function shuffle(arr) {
+  return [...arr].sort(() => Math.random() - 0.5)
+}
+
 export function selectPeerEvaluators(employee, allEmployees, limit = 2) {
-  const eligible = allEmployees.filter(e =>
-    e.id !== employee.id &&
-    e.id !== employee.manager_id &&
-    e.team_id === employee.team_id
+  const base = allEmployees.filter(e =>
+    e.id !== employee.id && e.id !== employee.manager_id
   )
 
-  const shuffled = [...eligible].sort(() => Math.random() - 0.5)
-  return shuffled.slice(0, limit)
+  const sameTeam = base.filter(e => e.team_id === employee.team_id)
+  if (sameTeam.length >= limit) {
+    return shuffle(sameTeam).slice(0, limit)
+  }
+
+  const sameDept = base.filter(e => e.department_id === employee.department_id)
+  if (sameDept.length >= limit) {
+    return shuffle(sameDept).slice(0, limit)
+  }
+
+  // Tier 3 só para colaboradores de departamentos administrativos
+  if (employee.department?.area === 'administrativa') {
+    const seenIds = new Set(sameDept.map(e => e.id))
+    const adminExtra = base.filter(e =>
+      !seenIds.has(e.id) && e.department?.area === 'administrativa'
+    )
+    return shuffle([...sameDept, ...adminExtra]).slice(0, limit)
+  }
+
+  return shuffle(sameDept).slice(0, limit)
 }

@@ -57,6 +57,16 @@ export const SCORE_LABELS = {
   5: 'Muito Bom',
 }
 
+export const DEPARTMENT_AREAS = {
+  ADMINISTRATIVA: 'administrativa',
+  PRODUCAO: 'producao',
+}
+
+export const DEPARTMENT_AREA_LABELS = {
+  administrativa: 'Administrativa',
+  producao: 'Produção',
+}
+
 export const DEFAULT_CRITERIA = [
   { key: 'responsibility', label: 'Responsabilidade' },
   { key: 'adaptability', label: 'Adaptação e Flexibilidade' },

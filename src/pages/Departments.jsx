@@ -100,6 +100,32 @@ export default function Departments() {
           color: var(--color-text);
           letter-spacing: -0.1px;
         }
+        .dept-area-badge {
+          display: inline-block;
+          margin-top: 3px;
+          font-size: 10px;
+          font-weight: 600;
+          letter-spacing: 0.4px;
+          text-transform: uppercase;
+          padding: 2px 7px;
+          border-radius: 4px;
+        }
+        .dept-area-badge[data-area='administrativa'] {
+          background: rgba(99,149,255,0.1);
+          color: #4a7fe0;
+        }
+        .dept-area-badge[data-area='producao'] {
+          background: rgba(80,190,120,0.1);
+          color: #2e9e5e;
+        }
+        [data-theme='dark'] .dept-area-badge[data-area='administrativa'] {
+          background: rgba(99,149,255,0.12);
+          color: #7aaaf5;
+        }
+        [data-theme='dark'] .dept-area-badge[data-area='producao'] {
+          background: rgba(80,190,120,0.12);
+          color: #5ec98a;
+        }
         .dept-desc {
           font-size: 12px;
           color: var(--color-text-muted);

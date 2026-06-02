@@ -1,4 +1,5 @@
 import { Building2, ChevronDown, ChevronUp, Pencil, Trash2, Plus, Users } from 'lucide-react'
+import { DEPARTMENT_AREA_LABELS } from '../../lib/constants'
 
 export default function DepartmentCard({
   dept,
@@ -24,6 +25,11 @@ export default function DepartmentCard({
         </div>
         <div className="dept-info">
           <div className="dept-name">{dept.name}</div>
+          {dept.area && (
+            <div className="dept-area-badge" data-area={dept.area}>
+              {DEPARTMENT_AREA_LABELS[dept.area]}
+            </div>
+          )}
         </div>
         <div className="dept-actions">
           <button
