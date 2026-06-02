@@ -36,7 +36,16 @@ export const CYCLE_STATUS_LABELS = {
 
 export const EVALUATION_STATUSES = {
   PENDING: 'pending',
+  SENT: 'sent',
+  OPENED: 'opened',
   SUBMITTED: 'submitted',
+}
+
+export const EVALUATION_STATUS_LABELS = {
+  pending: 'Pendente',
+  sent: 'Enviada',
+  opened: 'Aberta',
+  submitted: 'Submetida',
 }
 
 export const SCORE_LABELS = {

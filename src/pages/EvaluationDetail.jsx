@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, User, Users, UserCheck } from 'lucide-react'
+import { ArrowLeft, User, Users, UserCheck, Link2, Copy, Mail } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import EvaluationForm from '../components/evaluations/EvaluationForm'
 import EvaluationSummary from '../components/evaluations/EvaluationSummary'
@@ -9,12 +9,17 @@ import { formatDate } from '../utils/formatters'
 
 const TYPE_ICON = { self: User, peer: Users, manager: UserCheck }
 
+const EVAL_BASE_URL = 'https://gi-peopleflow.vercel.app/avaliar'
+
 export default function EvaluationDetail() {
   const { id } = useParams()
   const [evaluation, setEvaluation] = useState(null)
   const [criteria, setCriteria]     = useState([])
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState(null)
+  const [localToken, setLocalToken] = useState(null)
+  const [generating, setGenerating] = useState(false)
+  const [copied, setCopied]         = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -22,9 +27,9 @@ export default function EvaluationDetail() {
     const [evalResult, criteriaResult] = await Promise.all([
       supabase.from('pf_evaluations').select(`
         *,
-        cycle:pf_evaluation_cycles(id, name, anonymous, status),
+        cycle:pf_evaluation_cycles(id, name, anonymous, status, end_date),
         evaluatee:pf_employees!evaluatee_id(id, full_name, employee_number, role),
-        evaluator:pf_employees!evaluator_id(id, full_name, employee_number),
+        evaluator:pf_employees!evaluator_id(id, full_name, employee_number, email),
         answers:pf_evaluation_answers(id, criteria_id, score)
       `).eq('id', id).single(),
       supabase.from('pf_criteria').select('*').eq('active', true).order('sort_order'),
@@ -36,6 +41,49 @@ export default function EvaluationDetail() {
   }, [id])
 
   useEffect(() => { load() }, [load])
+
+  const handleGenerateToken = async () => {
+    setGenerating(true)
+    try {
+      const token = crypto.randomUUID()
+      const expiresAt = cycle?.end_date
+        ? new Date(cycle.end_date + 'T23:59:59').toISOString()
+        : null
+      const { error: err } = await supabase
+        .from('pf_evaluations')
+        .update({ token, token_expires_at: expiresAt, status: 'sent' })
+        .eq('id', id)
+      if (err) throw err
+      setLocalToken(token)
+      setEvaluation(ev => ({ ...ev, token, token_expires_at: expiresAt, status: 'sent' }))
+    } catch (err) {
+      console.error('Erro ao gerar token:', err)
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const handleCopyLink = () => {
+    const token = localToken || evaluation?.token
+    if (!token) return
+    navigator.clipboard.writeText(`${EVAL_BASE_URL}/${token}`)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleSendEmail = () => {
+    const token = localToken || evaluation?.token
+    if (!token) return
+    const link = `${EVAL_BASE_URL}/${token}`
+    const endDate = cycle?.end_date
+      ? new Date(cycle.end_date + 'T00:00:00').toLocaleDateString('pt-PT')
+      : '—'
+    const subject = encodeURIComponent(`Avaliação de Desempenho - ${evaluatee?.full_name ?? ''}`)
+    const body = encodeURIComponent(
+      `Olá ${evaluator?.full_name ?? ''},\n\nFoi gerada a sua avaliação de desempenho referente ao ciclo ${cycle?.name ?? ''}. Por favor aceda ao link abaixo para preencher o questionário até ${endDate}.\n\n${link}`
+    )
+    window.open(`mailto:${evaluator?.email ?? ''}?subject=${subject}&body=${body}`)
+  }
 
   const handleSubmit = async ({ scores, notes }) => {
     const answers = Object.entries(scores).map(([criteria_id, score]) => ({
@@ -315,6 +363,68 @@ export default function EvaluationDetail() {
           color: #5b6fa0;
           margin-bottom: 20px;
         }
+
+        /* ── Token section ── */
+        .ev-token-card {
+          padding: 14px 18px;
+          background: rgba(224,203,75,0.05);
+          border: 1px solid rgba(224,203,75,0.2);
+          border-radius: 11px;
+          margin-bottom: 20px;
+        }
+        .ev-token-label {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--color-text-muted);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: 10px;
+        }
+        .ev-token-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .ev-token-btn {
+          height: 34px;
+          padding: 0 14px;
+          border-radius: 7px;
+          font-size: 12px;
+          font-weight: 600;
+          font-family: 'Outfit', sans-serif;
+          border: 1px solid var(--color-border);
+          background: var(--color-surface);
+          color: var(--color-text);
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          cursor: pointer;
+          transition: background 0.15s, border-color 0.15s;
+        }
+        .ev-token-btn:hover { background: var(--color-hover); border-color: var(--color-accent); }
+        .ev-token-btn--copied {
+          background: rgba(34,197,94,0.08);
+          border-color: rgba(34,197,94,0.3);
+          color: #16a34a;
+        }
+        .ev-token-generate {
+          height: 36px;
+          padding: 0 16px;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 600;
+          font-family: 'Outfit', sans-serif;
+          border: none;
+          background: var(--color-accent);
+          color: var(--color-primary);
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          cursor: pointer;
+          transition: opacity 0.15s;
+          margin-bottom: 20px;
+        }
+        .ev-token-generate:hover:not(:disabled) { opacity: 0.88; }
+        .ev-token-generate:disabled { opacity: 0.45; cursor: not-allowed; }
       `}</style>
 
       <div>
@@ -376,6 +486,44 @@ export default function EvaluationDetail() {
             </div>
           )}
         </div>
+
+        {/* Token link section */}
+        {(evaluation.status === 'pending' || evaluation.status === 'sent') && (() => {
+          const displayToken = localToken || evaluation.token
+          if (displayToken) {
+            return (
+              <div className="ev-token-card">
+                <div className="ev-token-label">
+                  <Link2 size={13} color="var(--color-accent)" />
+                  Link de avaliação gerado
+                </div>
+                <div className="ev-token-actions">
+                  <button
+                    className={`ev-token-btn${copied ? ' ev-token-btn--copied' : ''}`}
+                    onClick={handleCopyLink}
+                  >
+                    <Copy size={13} />
+                    {copied ? 'Copiado!' : 'Copiar Link'}
+                  </button>
+                  <button className="ev-token-btn" onClick={handleSendEmail}>
+                    <Mail size={13} />
+                    Enviar Email
+                  </button>
+                </div>
+              </div>
+            )
+          }
+          return (
+            <button
+              className="ev-token-generate"
+              onClick={handleGenerateToken}
+              disabled={generating}
+            >
+              <Link2 size={14} />
+              {generating ? 'A gerar…' : 'Gerar Link de Avaliação'}
+            </button>
+          )
+        })()}
 
         {/* Notice if cycle not active but evaluation is pending */}
         {evaluation.status === 'pending' && cycle?.status !== 'active' && (

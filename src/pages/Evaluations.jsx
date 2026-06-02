@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { ClipboardList, ChevronRight, EyeOff, Eye, Search, X } from 'lucide-react'
+import { ClipboardList, ChevronRight, EyeOff, Eye, Search, X, Link2, Copy, Mail } from 'lucide-react'
+import { supabase } from '../lib/supabaseClient'
 import { useEvaluations } from '../hooks/useEvaluations'
 import { useCycles } from '../hooks/useCycles'
 import { EvaluationTypeBadge, EvaluationStatusBadge } from '../components/evaluations/EvaluationBadge'
@@ -17,6 +18,8 @@ const TYPE_FILTERS = [
 const STATUS_FILTERS = [
   { value: 'all',       label: 'Todos' },
   { value: 'pending',   label: 'Pendentes' },
+  { value: 'sent',      label: 'Enviadas' },
+  { value: 'opened',    label: 'Abertas' },
   { value: 'submitted', label: 'Submetidas' },
 ]
 
@@ -62,6 +65,10 @@ export default function Evaluations() {
     () => localStorage.getItem('pf_eval_group_by') ?? 'none'
   )
 
+  const [localTokens, setLocalTokens]   = useState({})
+  const [generatingId, setGeneratingId] = useState(null)
+  const [copiedId, setCopiedId]         = useState(null)
+
   const toggleHideSubmitted = () => {
     const next = !hideSubmitted
     setHideSubmitted(next)
@@ -71,6 +78,56 @@ export default function Evaluations() {
   const setGroupByPersisted = (val) => {
     setGroupBy(val)
     localStorage.setItem('pf_eval_group_by', val)
+  }
+
+  const EVAL_BASE_URL = 'https://gi-peopleflow.vercel.app/avaliar'
+
+  const handleGenerateToken = async (ev) => {
+    setGeneratingId(ev.id)
+    try {
+      const token = crypto.randomUUID()
+      const cycle = getCycle(ev)
+      const expiresAt = cycle?.end_date
+        ? new Date(cycle.end_date + 'T23:59:59').toISOString()
+        : null
+      const { error } = await supabase
+        .from('pf_evaluations')
+        .update({ token, token_expires_at: expiresAt, status: 'sent' })
+        .eq('id', ev.id)
+      if (error) throw error
+      setLocalTokens(prev => ({ ...prev, [ev.id]: token }))
+    } catch (err) {
+      console.error('Erro ao gerar token:', err)
+    } finally {
+      setGeneratingId(null)
+    }
+  }
+
+  const getToken = (ev) => localTokens[ev.id] || ev.token
+
+  const handleCopyLink = (ev) => {
+    const token = getToken(ev)
+    if (!token) return
+    navigator.clipboard.writeText(`${EVAL_BASE_URL}/${token}`)
+    setCopiedId(ev.id)
+    setTimeout(() => setCopiedId(id => id === ev.id ? null : id), 2000)
+  }
+
+  const handleSendEmail = (ev) => {
+    const token = getToken(ev)
+    if (!token) return
+    const evaluator = Array.isArray(ev.evaluator) ? ev.evaluator[0] : ev.evaluator
+    const evaluatee = getEvaluatee(ev)
+    const cycle = getCycle(ev)
+    const link = `${EVAL_BASE_URL}/${token}`
+    const endDate = cycle?.end_date
+      ? new Date(cycle.end_date + 'T00:00:00').toLocaleDateString('pt-PT')
+      : '—'
+    const subject = encodeURIComponent(`Avaliação de Desempenho - ${evaluatee?.full_name ?? ''}`)
+    const body = encodeURIComponent(
+      `Olá ${evaluator?.full_name ?? ''},\n\nFoi gerada a sua avaliação de desempenho referente ao ciclo ${cycle?.name ?? ''}. Por favor aceda ao link abaixo para preencher o questionário até ${endDate}.\n\n${link}`
+    )
+    window.open(`mailto:${evaluator?.email ?? ''}?subject=${subject}&body=${body}`)
   }
 
   const isAnonymousPeer = (ev) =>
@@ -114,43 +171,80 @@ export default function Evaluations() {
   const submitted = useMemo(() => evaluations.filter(e => e.status === 'submitted').length, [evaluations])
 
   const renderRow = (ev, i) => {
-    const evaluatee   = getEvaluatee(ev)
+    const evaluatee     = getEvaluatee(ev)
     const evaluatorName = getEvaluator(ev)
-    const cycle       = getCycle(ev)
+    const cycle         = getCycle(ev)
+    const canLink       = ev.status === 'pending' || ev.status === 'sent'
+    const token         = getToken(ev)
+    const hasToken      = !!token
+    const isGenerating  = generatingId === ev.id
+    const isCopied      = copiedId === ev.id
+
     return (
-      <Link
-        key={ev.id}
-        to={`/evaluations/${ev.id}`}
-        className="evl-row"
-        style={{ animationDelay: `${i * 0.03}s` }}
-      >
-        <div className="evl-main">
-          <div className="evl-top">
-            <span className="evl-name">{evaluatee?.full_name ?? '—'}</span>
-            {evaluatee?.employee_number && (
-              <span className="evl-number">#{evaluatee.employee_number}</span>
-            )}
-            <EvaluationTypeBadge type={ev.type} />
-            <EvaluationStatusBadge status={ev.status} />
+      <div key={ev.id} className="evl-row-wrap" style={{ animationDelay: `${i * 0.03}s` }}>
+        <Link to={`/evaluations/${ev.id}`} className="evl-row">
+          <div className="evl-main">
+            <div className="evl-top">
+              <span className="evl-name">{evaluatee?.full_name ?? '—'}</span>
+              {evaluatee?.employee_number && (
+                <span className="evl-number">#{evaluatee.employee_number}</span>
+              )}
+              <EvaluationTypeBadge type={ev.type} />
+              <EvaluationStatusBadge status={ev.status} />
+            </div>
+            <div className="evl-meta">
+              <span>Avaliador: {evaluatorName}</span>
+              {cycle?.name && (
+                <>
+                  <span className="evl-meta-sep">·</span>
+                  <span>{cycle.name}</span>
+                </>
+              )}
+              {ev.status === 'submitted' && ev.submitted_at && (
+                <>
+                  <span className="evl-meta-sep">·</span>
+                  <span>Submetida em {formatDate(ev.submitted_at)}</span>
+                </>
+              )}
+            </div>
           </div>
-          <div className="evl-meta">
-            <span>Avaliador: {evaluatorName}</span>
-            {cycle?.name && (
+          <ChevronRight size={16} className="evl-arrow" />
+        </Link>
+
+        {canLink && (
+          <div className="evl-row-actions">
+            {hasToken ? (
               <>
-                <span className="evl-meta-sep">·</span>
-                <span>{cycle.name}</span>
+                <button
+                  className={`evl-action-btn${isCopied ? ' evl-action-btn--copied' : ''}`}
+                  onClick={() => handleCopyLink(ev)}
+                  title="Copiar link da avaliação"
+                >
+                  <Copy size={12} />
+                  {isCopied ? 'Copiado!' : 'Copiar Link'}
+                </button>
+                <button
+                  className="evl-action-btn"
+                  onClick={() => handleSendEmail(ev)}
+                  title="Enviar email com link"
+                >
+                  <Mail size={12} />
+                  Email
+                </button>
               </>
-            )}
-            {ev.status === 'submitted' && ev.submitted_at && (
-              <>
-                <span className="evl-meta-sep">·</span>
-                <span>Submetida em {formatDate(ev.submitted_at)}</span>
-              </>
+            ) : (
+              <button
+                className="evl-action-btn evl-action-btn--generate"
+                onClick={() => handleGenerateToken(ev)}
+                disabled={isGenerating}
+              >
+                <Link2 size={12} />
+                {isGenerating ? '…' : 'Gerar Link'}
+              </button>
             )}
           </div>
-        </div>
-        <ChevronRight size={16} className="evl-arrow" />
-      </Link>
+        )}
+      </div>
     )
   }
 
@@ -166,7 +260,15 @@ export default function Evaluations() {
           to   { transform: translateX(200%); }
         }
 
+        .evl-row-wrap {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          animation: evl-slideIn 0.24s ease both;
+        }
         .evl-row {
+          flex: 1;
+          min-width: 0;
           display: flex;
           align-items: center;
           gap: 14px;
@@ -176,11 +278,50 @@ export default function Evaluations() {
           border-radius: 11px;
           text-decoration: none;
           transition: box-shadow 0.18s, border-color 0.18s;
-          animation: evl-slideIn 0.24s ease both;
         }
         .evl-row:hover {
           box-shadow: 0 2px 12px rgba(0,0,0,0.07);
           border-color: var(--color-accent);
+        }
+
+        .evl-row-actions {
+          display: flex;
+          gap: 5px;
+          flex-shrink: 0;
+        }
+        .evl-action-btn {
+          height: 30px;
+          padding: 0 10px;
+          border-radius: 7px;
+          font-size: 11px;
+          font-weight: 600;
+          font-family: 'Outfit', sans-serif;
+          border: 1px solid var(--color-border);
+          background: var(--color-surface);
+          color: var(--color-text-muted);
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }
+        .evl-action-btn:hover:not(:disabled) {
+          background: var(--color-hover);
+          color: var(--color-text);
+          border-color: var(--color-accent);
+        }
+        .evl-action-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .evl-action-btn--generate {
+          background: rgba(224,203,75,0.08);
+          border-color: rgba(224,203,75,0.3);
+          color: #a16207;
+        }
+        [data-theme='dark'] .evl-action-btn--generate { color: var(--color-accent); }
+        .evl-action-btn--copied {
+          background: rgba(34,197,94,0.08);
+          border-color: rgba(34,197,94,0.3);
+          color: #16a34a;
         }
 
         .evl-main { flex: 1; min-width: 0; }

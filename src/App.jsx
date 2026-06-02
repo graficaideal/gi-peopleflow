@@ -13,6 +13,7 @@ import Cycles from './pages/Cycles'
 import Departments from './pages/Departments'
 import Settings from './pages/Settings'
 import NotFound from './pages/NotFound'
+import EvaluationPublic from './pages/EvaluationPublic'
 import { useAuth } from './hooks/useAuth'
 
 function AuthRoute({ children }) {
@@ -43,6 +44,7 @@ export default function App() {
               <Route path="departments" element={<Departments />} />
               <Route path="settings" element={<Settings />} />
             </Route>
+            <Route path="/avaliar/:token" element={<EvaluationPublic />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
