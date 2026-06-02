@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Plus, RefreshCw, X } from 'lucide-react'
+import { supabase } from '../lib/supabaseClient'
 import { useCycles } from '../hooks/useCycles'
 import CycleCard from '../components/cycles/CycleCard'
 import CycleForm from '../components/cycles/CycleForm'
@@ -50,6 +51,16 @@ export default function Cycles() {
     try {
       const newStatus = confirmModal.type === 'activate' ? 'active' : 'closed'
       await updateCycle(confirmModal.cycle.id, { status: newStatus })
+
+      if (confirmModal.type === 'close') {
+        const { error: cancelErr } = await supabase
+          .from('pf_evaluations')
+          .update({ status: 'cancelled' })
+          .eq('cycle_id', confirmModal.cycle.id)
+          .in('status', ['pending', 'sent', 'opened'])
+        if (cancelErr) console.error('Erro ao cancelar avaliações:', cancelErr)
+      }
+
       setConfirmModal(null)
     } catch (err) {
       setActError(err.message)
@@ -540,7 +551,12 @@ export default function Cycles() {
                     )}
                   </>
                 ) : (
-                  <>Fechar <strong>{confirmModal.cycle.name}</strong>? Esta acção não pode ser desfeita.</>
+                  <>
+                    Fechar <strong>{confirmModal.cycle.name}</strong>? Esta acção não pode ser desfeita.
+                    <span style={{ display: 'block', marginTop: 8, color: 'var(--color-text-muted)' }}>
+                      Todas as avaliações pendentes, enviadas ou abertas serão automaticamente canceladas.
+                    </span>
+                  </>
                 )}
               </p>
               {actError && <p className="cy-error">{actError}</p>}

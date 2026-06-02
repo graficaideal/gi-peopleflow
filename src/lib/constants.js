@@ -39,6 +39,7 @@ export const EVALUATION_STATUSES = {
   SENT: 'sent',
   OPENED: 'opened',
   SUBMITTED: 'submitted',
+  CANCELLED: 'cancelled',
 }
 
 export const EVALUATION_STATUS_LABELS = {

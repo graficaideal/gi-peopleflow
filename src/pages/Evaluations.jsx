@@ -13,6 +13,7 @@ const STATUS_CFG = {
   sent:      { color: '#5b86c5', label: 'Enviada' },
   opened:    { color: '#d97706', label: 'Aberta' },
   submitted: { color: '#16a34a', label: 'Concluída' },
+  cancelled: { color: '#c05252', label: 'Cancelada' },
 }
 
 const TYPE_CFG = {
@@ -36,6 +37,7 @@ const STATUS_FILTERS = [
   { value: 'sent',      label: 'Enviadas' },
   { value: 'opened',    label: 'Abertas' },
   { value: 'submitted', label: 'Concluídas' },
+  { value: 'cancelled', label: 'Canceladas' },
 ]
 
 const GROUPBY_OPTIONS = [
@@ -154,7 +156,10 @@ export default function Evaluations() {
     if (cycleFilter !== 'all')  list = list.filter(e => e.cycle_id === cycleFilter)
     if (typeFilter !== 'all')   list = list.filter(e => e.type === typeFilter)
     if (statusFilter !== 'all') list = list.filter(e => (localChanges[e.id]?.status ?? e.status) === statusFilter)
-    if (hideSubmitted)          list = list.filter(e => (localChanges[e.id]?.status ?? e.status) !== 'submitted')
+    if (hideSubmitted)          list = list.filter(e => {
+      const s = localChanges[e.id]?.status ?? e.status
+      return s !== 'submitted' && s !== 'cancelled'
+    })
     if (search.trim()) {
       const q = search.trim().toLowerCase()
       list = list.filter(e => {
@@ -186,7 +191,7 @@ export default function Evaluations() {
   }, [filtered, groupBy])
 
   const counts = useMemo(() => {
-    const c = { pending: 0, sent: 0, opened: 0, submitted: 0 }
+    const c = { pending: 0, sent: 0, opened: 0, submitted: 0, cancelled: 0 }
     evaluations.forEach(ev => { const s = localChanges[ev.id]?.status ?? ev.status; if (s in c) c[s]++ })
     return c
   }, [evaluations, localChanges])
@@ -205,7 +210,8 @@ export default function Evaluations() {
     const isCopied   = copiedId === ev.id
     const isSent     = es !== 'pending'
     const canToggle  = es === 'pending' || es === 'sent'
-    const isCompleted = es === 'submitted'
+    const isCompleted  = es === 'submitted'
+    const isCancelled  = es === 'cancelled'
     const hasEmail   = !!getRecipient(ev)?.email
     const initials   = (evaluatee?.full_name ?? '?').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
     const evalName   = evaluator?.full_name ?? null
@@ -213,7 +219,7 @@ export default function Evaluations() {
     return (
       <tr
         key={ev.id}
-        className={`evl-tr${isCompleted ? ' evl-tr-done' : ''}`}
+        className={`evl-tr${isCompleted ? ' evl-tr-done' : ''}${isCancelled ? ' evl-tr-cancelled' : ''}`}
         onClick={() => navigate(`/evaluations/${ev.id}`)}
         style={{ animationDelay: `${Math.min(i, 40) * 0.012}s` }}
       >
@@ -529,6 +535,8 @@ export default function Evaluations() {
         .evl-tr:hover { background: var(--color-hover); }
         .evl-tr-done { opacity: 0.62; }
         .evl-tr-done:hover { opacity: 1; }
+        .evl-tr-cancelled { opacity: 0.45; }
+        .evl-tr-cancelled:hover { opacity: 0.8; }
         .evl-table tbody .evl-tr:not(:last-child) td,
         .evl-table tbody .evl-tr:not(:last-child) th {
           border-bottom: 1px solid var(--color-border);
@@ -757,7 +765,7 @@ export default function Evaluations() {
             <div className="evl-viewbar-right">
               <button className={`evl-toggle-btn${hideSubmitted ? ' on' : ''}`} onClick={toggleHideSubmitted}>
                 {hideSubmitted ? <Eye size={10} /> : <EyeOff size={10} />}
-                {hideSubmitted ? 'Mostrar concluídas' : 'Ocultar concluídas'}
+                {hideSubmitted ? 'Mostrar finalizados' : 'Ocultar finalizados'}
               </button>
             </div>
           </div>
