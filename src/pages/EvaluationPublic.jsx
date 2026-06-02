@@ -85,6 +85,12 @@ export default function EvaluationPublic() {
       score,
     }))
 
+    const { error: deleteErr } = await supabase
+      .from('pf_evaluation_answers')
+      .delete()
+      .eq('evaluation_id', evaluation.id)
+    if (deleteErr) { setSubmitError(deleteErr.message); setSaving(false); return }
+
     const { error: answersErr } = await supabase
       .from('pf_evaluation_answers')
       .insert(answers)
