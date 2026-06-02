@@ -44,9 +44,8 @@ export default function EvaluationPublic() {
     }
     if (ev.status === 'submitted')  { setPageState('already_submitted'); return }
     if (ev.status === 'cancelled')  { setPageState('invalid'); return }
-    if (ev.status === 'pending')    { setPageState('invalid'); return }
 
-    if (ev.status === 'sent') {
+    if (ev.status === 'pending' || ev.status === 'sent') {
       const { error: updateErr } = await supabase
         .from('pf_evaluations')
         .update({ status: 'opened' })
