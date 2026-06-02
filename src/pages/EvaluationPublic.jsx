@@ -5,7 +5,7 @@ import { SCORE_LABELS, EVALUATION_TYPE_LABELS } from '../lib/constants'
 import { formatDate } from '../utils/formatters'
 
 function avgColor(v) {
-  if (!v) return '#6b7280'
+  if (!v) return 'var(--color-text-muted)'
   if (v <= 2) return '#e05252'
   if (v <= 3) return '#ca8a04'
   return '#16a34a'
@@ -20,6 +20,16 @@ export default function EvaluationPublic() {
   const [notes, setNotes]           = useState('')
   const [saving, setSaving]         = useState(false)
   const [submitError, setSubmitError] = useState('')
+
+  // Force dark mode regardless of user preference; restore on unmount
+  useEffect(() => {
+    const prev = document.documentElement.getAttribute('data-theme')
+    document.documentElement.setAttribute('data-theme', 'dark')
+    return () => {
+      if (prev) document.documentElement.setAttribute('data-theme', prev)
+      else document.documentElement.removeAttribute('data-theme')
+    }
+  }, [])
 
   const load = useCallback(async () => {
     const [evalRes, criteriaRes] = await Promise.all([
@@ -47,18 +57,11 @@ export default function EvaluationPublic() {
 
     setEvaluation(ev)
     setCriteria(criteriaRes.data ?? [])
-
-    const existingScores = Object.fromEntries(
-      (ev.answers ?? []).map(a => [a.criteria_id, a.score])
-    )
-    setScores(existingScores)
+    setScores(Object.fromEntries((ev.answers ?? []).map(a => [a.criteria_id, a.score])))
     setNotes(ev.notes ?? '')
 
     if (ev.status === 'sent') {
-      await supabase
-        .from('pf_evaluations')
-        .update({ status: 'opened' })
-        .eq('id', ev.id)
+      await supabase.from('pf_evaluations').update({ status: 'opened' }).eq('id', ev.id)
     }
 
     setPageState('form')
@@ -85,19 +88,12 @@ export default function EvaluationPublic() {
     const { error: answersErr } = await supabase
       .from('pf_evaluation_answers')
       .upsert(answers, { onConflict: 'evaluation_id,criteria_id' })
-
     if (answersErr) { setSubmitError(answersErr.message); setSaving(false); return }
 
     const { error: evalErr } = await supabase
       .from('pf_evaluations')
-      .update({
-        status: 'submitted',
-        submitted_at: new Date().toISOString(),
-        notes: notes.trim() || null,
-        token: null,
-      })
+      .update({ status: 'submitted', submitted_at: new Date().toISOString(), notes: notes.trim() || null, token: null })
       .eq('id', evaluation.id)
-
     if (evalErr) { setSubmitError(evalErr.message); setSaving(false); return }
 
     setPageState('success')
@@ -114,14 +110,11 @@ export default function EvaluationPublic() {
   return (
     <>
       <style>{`
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #f8f9fa; }
-
         .pub-page {
           min-height: 100vh;
-          background: #f8f9fa;
+          background: var(--color-bg);
           font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          color: #111827;
+          color: var(--color-text);
         }
 
         .pub-header {
@@ -129,23 +122,22 @@ export default function EvaluationPublic() {
           align-items: center;
           gap: 10px;
           padding: 16px 24px;
-          background: #fff;
-          border-bottom: 1px solid #e5e7eb;
+          background: var(--color-surface);
+          border-bottom: 1px solid var(--color-border);
+          position: sticky;
+          top: 0;
+          z-index: 10;
         }
-        .pub-header-logo {
-          width: 28px;
-          height: auto;
-        }
+        .pub-header-logo { width: 28px; height: auto; }
         .pub-header-name {
           font-size: 15px;
           font-weight: 700;
-          color: #111827;
+          color: var(--color-text);
           letter-spacing: -0.3px;
         }
-        .pub-header-sub {
+        .pub-header-dot {
           font-size: 13px;
-          color: #6b7280;
-          margin-left: 2px;
+          color: var(--color-text-muted);
         }
 
         .pub-main {
@@ -155,58 +147,46 @@ export default function EvaluationPublic() {
         }
 
         .pub-card {
-          background: #fff;
-          border: 1px solid #e5e7eb;
+          background: var(--color-surface);
+          border: 1px solid var(--color-border);
           border-radius: 14px;
           padding: 28px;
           margin-bottom: 16px;
         }
 
-        .pub-meta-tag {
-          display: inline-flex;
-          align-items: center;
-          padding: 3px 10px;
-          border-radius: 20px;
-          font-size: 11px;
-          font-weight: 600;
-        }
-
         .pub-section-label {
           font-size: 11px;
           font-weight: 600;
-          color: #9ca3af;
+          color: var(--color-text-muted);
           text-transform: uppercase;
           letter-spacing: 0.6px;
           margin-bottom: 14px;
         }
 
+        /* Criteria */
         .pub-cr-row {
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 16px;
           padding: 14px 0;
-          border-bottom: 1px solid #f3f4f6;
+          border-bottom: 1px solid var(--color-border);
         }
         .pub-cr-row:last-child { border-bottom: none; }
         .pub-cr-label {
           font-size: 13px;
           font-weight: 500;
-          color: #374151;
+          color: var(--color-text);
           flex: 1;
           min-width: 0;
         }
-        .pub-cr-scores {
-          display: flex;
-          gap: 5px;
-          flex-shrink: 0;
-        }
+        .pub-cr-scores { display: flex; gap: 5px; flex-shrink: 0; }
         .pub-cr-btn {
-          width: 54px;
-          height: 48px;
+          width: 56px;
+          height: 50px;
           border-radius: 9px;
-          border: 1.5px solid #e5e7eb;
-          background: #f9fafb;
+          border: 1px solid var(--color-border);
+          background: var(--color-bg);
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -216,38 +196,39 @@ export default function EvaluationPublic() {
           transition: border-color 0.15s, background 0.15s;
         }
         .pub-cr-btn:hover {
-          border-color: #d4a017;
-          background: rgba(212,160,23,0.05);
+          border-color: var(--color-accent);
+          background: rgba(224,203,75,0.06);
         }
         .pub-cr-btn.selected {
-          background: #d4a017;
-          border-color: #d4a017;
+          background: var(--color-accent);
+          border-color: var(--color-accent);
         }
         .pub-cr-num {
-          font-size: 14px;
+          font-size: 15px;
           font-weight: 700;
-          color: #374151;
+          color: var(--color-text);
           line-height: 1;
         }
         .pub-cr-lbl {
           font-size: 8.5px;
           font-weight: 500;
-          color: #9ca3af;
+          color: var(--color-text-muted);
           text-transform: uppercase;
           letter-spacing: 0.2px;
           text-align: center;
           line-height: 1.2;
         }
         .pub-cr-btn.selected .pub-cr-num,
-        .pub-cr-btn.selected .pub-cr-lbl { color: #fff; }
+        .pub-cr-btn.selected .pub-cr-lbl { color: var(--color-primary); }
 
+        /* Notes */
         .pub-textarea {
           width: 100%;
           padding: 10px 13px;
-          border: 1.5px solid #e5e7eb;
+          border: 1px solid var(--color-border);
           border-radius: 9px;
-          background: #f9fafb;
-          color: #111827;
+          background: var(--color-bg);
+          color: var(--color-text);
           font-size: 13px;
           font-family: inherit;
           outline: none;
@@ -255,30 +236,22 @@ export default function EvaluationPublic() {
           line-height: 1.55;
           transition: border-color 0.15s;
         }
-        .pub-textarea:focus { border-color: #d4a017; }
-        .pub-textarea::placeholder { color: #9ca3af; }
+        .pub-textarea:focus { border-color: var(--color-accent); }
+        .pub-textarea::placeholder { color: var(--color-text-muted); }
 
+        /* Average */
         .pub-avg-row {
           display: flex;
           align-items: center;
           justify-content: space-between;
           padding: 14px 18px;
-          background: #f9fafb;
-          border: 1px solid #e5e7eb;
+          background: var(--color-hover);
+          border: 1px solid var(--color-border);
           border-radius: 10px;
           margin-bottom: 16px;
         }
 
-        .pub-error {
-          font-size: 12px;
-          color: #e05252;
-          background: rgba(220,60,60,0.06);
-          border: 1px solid rgba(220,60,60,0.15);
-          border-radius: 7px;
-          padding: 8px 12px;
-          margin-bottom: 14px;
-        }
-
+        /* Submit */
         .pub-submit-btn {
           height: 42px;
           padding: 0 24px;
@@ -287,18 +260,27 @@ export default function EvaluationPublic() {
           font-weight: 600;
           font-family: inherit;
           border: none;
-          background: #d4a017;
-          color: #fff;
+          background: var(--color-accent);
+          color: var(--color-primary);
           cursor: pointer;
           transition: opacity 0.15s;
         }
         .pub-submit-btn:hover:not(:disabled) { opacity: 0.88; }
         .pub-submit-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-        .pub-state-box {
-          text-align: center;
-          padding: 48px 24px;
+        /* Error */
+        .pub-error {
+          font-size: 12px;
+          color: #e05252;
+          background: rgba(220,60,60,0.08);
+          border: 1px solid rgba(220,60,60,0.18);
+          border-radius: 7px;
+          padding: 8px 12px;
+          margin-bottom: 14px;
         }
+
+        /* State pages */
+        .pub-state-box { text-align: center; padding: 48px 24px; }
         .pub-state-icon {
           width: 56px;
           height: 56px;
@@ -312,17 +294,17 @@ export default function EvaluationPublic() {
         .pub-state-title {
           font-size: 18px;
           font-weight: 700;
-          color: #111827;
+          color: var(--color-text);
           margin-bottom: 8px;
         }
         .pub-state-msg {
           font-size: 14px;
-          color: #6b7280;
+          color: var(--color-text-muted);
           line-height: 1.6;
         }
 
         @media (max-width: 560px) {
-          .pub-cr-btn { width: 44px; height: 42px; }
+          .pub-cr-btn { width: 44px; height: 44px; }
           .pub-cr-num { font-size: 13px; }
           .pub-cr-lbl { display: none; }
           .pub-card { padding: 20px 16px; }
@@ -332,22 +314,20 @@ export default function EvaluationPublic() {
       <div className="pub-page">
         <header className="pub-header">
           <img src="/logo.svg" alt="GI" className="pub-header-logo" />
-          <div>
-            <span className="pub-header-name">PeopleFlow</span>
-            <span className="pub-header-sub"> · GI</span>
-          </div>
+          <span className="pub-header-name">PeopleFlow</span>
+          <span className="pub-header-dot">· GI</span>
         </header>
 
         <main className="pub-main">
           {pageState === 'loading' && (
             <div className="pub-card pub-state-box">
-              <div style={{ color: '#9ca3af', fontSize: 14 }}>A carregar…</div>
+              <div style={{ color: 'var(--color-text-muted)', fontSize: 14 }}>A carregar…</div>
             </div>
           )}
 
           {pageState === 'invalid' && (
             <div className="pub-card pub-state-box">
-              <div className="pub-state-icon" style={{ background: '#fee2e2' }}>🔗</div>
+              <div className="pub-state-icon" style={{ background: 'rgba(220,60,60,0.12)' }}>🔗</div>
               <div className="pub-state-title">Link inválido</div>
               <div className="pub-state-msg">Este link não existe ou foi removido.</div>
             </div>
@@ -355,20 +335,18 @@ export default function EvaluationPublic() {
 
           {pageState === 'expired' && (
             <div className="pub-card pub-state-box">
-              <div className="pub-state-icon" style={{ background: '#fef3c7' }}>⏱</div>
+              <div className="pub-state-icon" style={{ background: 'rgba(202,138,4,0.12)' }}>⏱</div>
               <div className="pub-state-title">Link expirado</div>
               <div className="pub-state-msg">
                 O prazo para preencher esta avaliação terminou.
-                {cycle?.end_date && (
-                  <> Prazo era {formatDate(cycle.end_date)}.</>
-                )}
+                {cycle?.end_date && <> Prazo era {formatDate(cycle.end_date)}.</>}
               </div>
             </div>
           )}
 
           {pageState === 'already_submitted' && (
             <div className="pub-card pub-state-box">
-              <div className="pub-state-icon" style={{ background: '#dcfce7' }}>✓</div>
+              <div className="pub-state-icon" style={{ background: 'rgba(22,163,74,0.12)' }}>✓</div>
               <div className="pub-state-title">Avaliação já submetida</div>
               <div className="pub-state-msg">Esta avaliação já foi preenchida anteriormente. Obrigado!</div>
             </div>
@@ -376,73 +354,71 @@ export default function EvaluationPublic() {
 
           {pageState === 'success' && (
             <div className="pub-card pub-state-box">
-              <div className="pub-state-icon" style={{ background: '#dcfce7' }}>✓</div>
+              <div className="pub-state-icon" style={{ background: 'rgba(22,163,74,0.12)' }}>✓</div>
               <div className="pub-state-title">Avaliação submetida!</div>
-              <div className="pub-state-msg">
-                Obrigado. A sua avaliação foi registada com sucesso.
-              </div>
+              <div className="pub-state-msg">Obrigado. A sua avaliação foi registada com sucesso.</div>
             </div>
           )}
 
           {pageState === 'form' && evaluation && (
             <>
-              {/* Evaluation header */}
-              <div className="pub-card" style={{ marginBottom: 16 }}>
-                <div style={{ marginBottom: 12 }}>
-                  <h1 style={{ fontSize: 20, fontWeight: 700, color: '#111827', letterSpacing: '-0.3px', marginBottom: 6 }}>
-                    {evaluatee?.full_name ?? '—'}
-                  </h1>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span className="pub-meta-tag" style={{ background: 'rgba(91,111,160,0.1)', color: '#5b6fa0' }}>
-                      {EVALUATION_TYPE_LABELS[evaluation.type] ?? evaluation.type}
-                    </span>
-                    {cycle?.name && (
-                      <span style={{ fontSize: 13, color: '#6b7280' }}>{cycle.name}</span>
-                    )}
-                  </div>
+              {/* Header card */}
+              <div className="pub-card">
+                <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.3px', marginBottom: 8 }}>
+                  {evaluatee?.full_name ?? '—'}
+                </h1>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: cycle?.end_date ? 14 : 0 }}>
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center',
+                    padding: '3px 10px', borderRadius: 20,
+                    fontSize: 11, fontWeight: 600,
+                    background: 'rgba(91,111,160,0.12)', color: '#7c8fc0',
+                  }}>
+                    {EVALUATION_TYPE_LABELS[evaluation.type] ?? evaluation.type}
+                  </span>
+                  {cycle?.name && (
+                    <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{cycle.name}</span>
+                  )}
                 </div>
                 {cycle?.end_date && (
                   <div style={{
                     padding: '10px 14px',
-                    background: 'rgba(212,160,23,0.07)',
-                    border: '1px solid rgba(212,160,23,0.2)',
+                    background: 'rgba(224,203,75,0.07)',
+                    border: '1px solid rgba(224,203,75,0.18)',
                     borderRadius: 8,
                     fontSize: 12,
-                    color: '#92400e',
+                    color: 'var(--color-accent)',
                   }}>
                     Prazo para preenchimento: <strong>{formatDate(cycle.end_date)}</strong>
                   </div>
                 )}
               </div>
 
-              {/* Criteria form */}
+              {/* Form */}
               <form onSubmit={handleSubmit}>
                 <div className="pub-card">
                   <div className="pub-section-label">Critérios de avaliação</div>
-                  <div>
-                    {criteria.map(c => (
-                      <div key={c.id} className="pub-cr-row">
-                        <div className="pub-cr-label">{c.label}</div>
-                        <div className="pub-cr-scores">
-                          {[1, 2, 3, 4, 5].map(n => (
-                            <button
-                              key={n}
-                              type="button"
-                              className={`pub-cr-btn${scores[c.id] === n ? ' selected' : ''}`}
-                              onClick={() => setScores(s => ({ ...s, [c.id]: n }))}
-                              title={SCORE_LABELS[n]}
-                            >
-                              <span className="pub-cr-num">{n}</span>
-                              <span className="pub-cr-lbl">{SCORE_LABELS[n]}</span>
-                            </button>
-                          ))}
-                        </div>
+                  {criteria.map(c => (
+                    <div key={c.id} className="pub-cr-row">
+                      <div className="pub-cr-label">{c.label}</div>
+                      <div className="pub-cr-scores">
+                        {[1, 2, 3, 4, 5].map(n => (
+                          <button
+                            key={n}
+                            type="button"
+                            className={`pub-cr-btn${scores[c.id] === n ? ' selected' : ''}`}
+                            onClick={() => setScores(s => ({ ...s, [c.id]: n }))}
+                            title={SCORE_LABELS[n]}
+                          >
+                            <span className="pub-cr-num">{n}</span>
+                            <span className="pub-cr-lbl">{SCORE_LABELS[n]}</span>
+                          </button>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
 
-                {/* Notes */}
                 <div className="pub-card">
                   <div className="pub-section-label">Notas (opcional)</div>
                   <textarea
@@ -454,10 +430,9 @@ export default function EvaluationPublic() {
                   />
                 </div>
 
-                {/* Live average */}
                 {avg !== null && (
-                  <div className="pub-avg-row" style={{ marginBottom: 16 }}>
-                    <span style={{ fontSize: 13, color: '#6b7280' }}>
+                  <div className="pub-avg-row">
+                    <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
                       Média parcial ({scoreValues.length}/{criteria.length} critérios)
                     </span>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
@@ -480,7 +455,7 @@ export default function EvaluationPublic() {
                     {saving ? 'A submeter…' : 'Submeter Avaliação'}
                   </button>
                   {scoreValues.length < criteria.length && (
-                    <span style={{ fontSize: 12, color: '#9ca3af' }}>
+                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
                       {scoreValues.length} de {criteria.length} critérios preenchidos
                     </span>
                   )}
