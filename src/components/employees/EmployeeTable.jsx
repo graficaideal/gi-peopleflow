@@ -30,7 +30,7 @@ export default function EmployeeTable({ employees, lastEvalScores = {}, onEdit, 
           <tr>
             <th style={{ width: 44 }} />
             <th>Colaborador</th>
-            <th>Função</th>
+            <th>Categoria Profissional</th>
             <th>Departamento</th>
             <th>Equipa</th>
             <th>Estado</th>
@@ -56,7 +56,7 @@ export default function EmployeeTable({ employees, lastEvalScores = {}, onEdit, 
                   <div className="emp-name">{emp.full_name}</div>
                   <div className="emp-number">#{emp.employee_number}</div>
                 </td>
-                <td className="emp-cell-muted">{emp.role ?? '—'}</td>
+                <td className="emp-cell-muted">{emp.job_category?.name ?? '—'}</td>
                 <td className="emp-cell-muted">{emp.department?.name ?? '—'}</td>
                 <td className="emp-cell-muted">{emp.team?.name ?? '—'}</td>
                 <td>

@@ -96,7 +96,7 @@ export default function Employees() {
       list = list.filter(e =>
         e.full_name?.toLowerCase().includes(q) ||
         e.employee_number?.toLowerCase().includes(q) ||
-        e.role?.toLowerCase().includes(q)
+        e.job_category?.name?.toLowerCase().includes(q)
       )
     }
     return list
@@ -145,7 +145,7 @@ export default function Employees() {
             className="emp-search-input"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Pesquisar por nome, número ou função…"
+            placeholder="Pesquisar por nome, número ou categoria…"
           />
           {search && (
             <button className="emp-search-clear" onClick={() => setSearch('')}>

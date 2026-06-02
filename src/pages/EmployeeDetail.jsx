@@ -84,7 +84,8 @@ export default function EmployeeDetail() {
         *,
         department:pf_departments(id, name),
         team:pf_teams(id, name),
-        manager:pf_employees!manager_id(id, full_name, employee_number)
+        manager:pf_employees!manager_id(id, full_name, employee_number),
+        job_category:pf_job_categories(id, name)
       `)
       .eq('id', id)
       .single()
@@ -179,7 +180,7 @@ export default function EmployeeDetail() {
             <span className={`emp-status ${statusCfg.cls}`}>{statusCfg.label}</span>
           </div>
           <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-            {employee.role ?? 'Sem função definida'}
+            {employee.job_category?.name ?? 'Sem categoria definida'}
             <span style={{ margin: '0 7px', opacity: 0.4 }}>·</span>
             #{employee.employee_number}
           </p>
@@ -425,9 +426,10 @@ export default function EmployeeDetail() {
           title="Editar Colaborador"
           initialValues={{
             ...employee,
-            department_id: employee.department?.id ?? employee.department_id ?? '',
-            team_id:       employee.team?.id       ?? employee.team_id       ?? '',
-            manager_id:    employee.manager?.id    ?? employee.manager_id    ?? '',
+            department_id:   employee.department?.id    ?? employee.department_id    ?? '',
+            team_id:         employee.team?.id          ?? employee.team_id          ?? '',
+            manager_id:      employee.manager?.id       ?? employee.manager_id       ?? '',
+            job_category_id: employee.job_category?.id  ?? employee.job_category_id ?? '',
           }}
           employees={employees}
           selfId={id}

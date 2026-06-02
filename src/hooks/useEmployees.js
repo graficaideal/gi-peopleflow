@@ -13,10 +13,11 @@ export function useEmployees() {
       .from('pf_employees')
       .select(`
         id, employee_number, full_name, role, email, status,
-        department_id, team_id, manager_id,
+        department_id, team_id, manager_id, job_category_id,
         department:pf_departments(id, name),
         team:pf_teams(id, name),
-        manager:pf_employees!manager_id(id, full_name, employee_number)
+        manager:pf_employees!manager_id(id, full_name, employee_number),
+        job_category:pf_job_categories(id, name)
       `)
       .order('full_name')
     if (err) { setError(err.message); setLoading(false); return }

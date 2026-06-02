@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
+import { supabase } from '../../lib/supabaseClient'
 import { useDepartments } from '../../hooks/useDepartments'
 
 const STATUS_OPTIONS = [
@@ -10,18 +11,29 @@ const STATUS_OPTIONS = [
 
 export default function EmployeeForm({ title, initialValues = {}, employees = [], selfId, onSubmit, onClose }) {
   const { departments } = useDepartments()
+  const [jobCategories, setJobCategories] = useState([])
+  const [catSearch, setCatSearch] = useState('')
+  const [catOpen, setCatOpen] = useState(false)
+  const catRef = useRef(null)
+
   const [vals, setVals] = useState({
-    employee_number: initialValues.employee_number ?? '',
-    full_name:       initialValues.full_name ?? '',
-    email:           initialValues.email ?? '',
-    role:            initialValues.role ?? '',
-    department_id:   initialValues.department_id ?? '',
-    team_id:         initialValues.team_id ?? '',
-    manager_id:      initialValues.manager_id ?? '',
-    status:          initialValues.status ?? 'active',
+    employee_number:  initialValues.employee_number ?? '',
+    full_name:        initialValues.full_name ?? '',
+    email:            initialValues.email ?? '',
+    job_category_id:  initialValues.job_category_id ?? '',
+    department_id:    initialValues.department_id ?? '',
+    team_id:          initialValues.team_id ?? '',
+    manager_id:       initialValues.manager_id ?? '',
+    status:           initialValues.status ?? 'active',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    supabase.from('pf_job_categories').select('id, name').order('name').then(({ data }) => {
+      setJobCategories(data ?? [])
+    })
+  }, [])
 
   const set = (field) => (e) => {
     const value = e.target.value
@@ -39,19 +51,25 @@ export default function EmployeeForm({ title, initialValues = {}, employees = []
 
   const managerOptions = employees.filter(e => e.id !== selfId)
 
+  const selectedCatLabel = jobCategories.find(c => c.id === vals.job_category_id)?.name ?? ''
+  const filteredCats = useMemo(
+    () => jobCategories.filter(c => c.name.toLowerCase().includes(catSearch.toLowerCase())),
+    [jobCategories, catSearch]
+  )
+
   const handleSubmit = async () => {
     if (!vals.full_name.trim() || !vals.employee_number.trim()) return
     setError('')
     setSaving(true)
     const payload = {
-      employee_number: vals.employee_number.trim().padStart(4, '0'),
-      full_name:       vals.full_name.trim(),
-      email:           vals.email.trim() || null,
-      role:            vals.role.trim() || null,
-      department_id:   vals.department_id || null,
-      team_id:         vals.team_id || null,
-      manager_id:      vals.manager_id || null,
-      status:          vals.status,
+      employee_number:  vals.employee_number.trim().padStart(4, '0'),
+      full_name:        vals.full_name.trim(),
+      email:            vals.email.trim() || null,
+      job_category_id:  vals.job_category_id || null,
+      department_id:    vals.department_id || null,
+      team_id:          vals.team_id || null,
+      manager_id:       vals.manager_id || null,
+      status:           vals.status,
     }
     try {
       await onSubmit(payload)
@@ -105,14 +123,66 @@ export default function EmployeeForm({ title, initialValues = {}, employees = []
             />
           </div>
 
-          <div className="ui-field">
-            <label>Função</label>
-            <input
-              className="ui-input"
-              value={vals.role}
-              onChange={set('role')}
-              placeholder="Ex: Cozinheiro, Chefe de Sala…"
-            />
+          <div className="ui-field" ref={catRef} style={{ position: 'relative' }}>
+            <label>Categoria Profissional</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                className="ui-input"
+                value={catOpen ? catSearch : selectedCatLabel}
+                onChange={e => { setCatSearch(e.target.value); setCatOpen(true) }}
+                onFocus={() => { setCatSearch(''); setCatOpen(true) }}
+                onBlur={() => setTimeout(() => setCatOpen(false), 150)}
+                placeholder="Pesquisar categoria…"
+                style={{ paddingRight: vals.job_category_id ? 28 : undefined }}
+              />
+              {vals.job_category_id && !catOpen && (
+                <button
+                  type="button"
+                  style={{
+                    position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                    background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                    color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center',
+                  }}
+                  onClick={() => setVals(prev => ({ ...prev, job_category_id: '' }))}
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+            {catOpen && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+                borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                maxHeight: 200, overflowY: 'auto', marginTop: 4,
+              }}>
+                {filteredCats.length === 0 ? (
+                  <div style={{ padding: '10px 14px', fontSize: 13, color: 'var(--color-text-muted)' }}>
+                    Sem resultados
+                  </div>
+                ) : filteredCats.map(c => (
+                  <div
+                    key={c.id}
+                    onMouseDown={() => {
+                      setVals(prev => ({ ...prev, job_category_id: c.id }))
+                      setCatSearch('')
+                      setCatOpen(false)
+                    }}
+                    style={{
+                      padding: '9px 14px', fontSize: 13, cursor: 'pointer',
+                      color: c.id === vals.job_category_id ? 'var(--color-accent)' : 'var(--color-text)',
+                      fontWeight: c.id === vals.job_category_id ? 600 : 400,
+                      background: c.id === vals.job_category_id ? 'var(--color-hover)' : 'transparent',
+                      transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={e => { if (c.id !== vals.job_category_id) e.currentTarget.style.background = 'var(--color-hover)' }}
+                    onMouseLeave={e => { if (c.id !== vals.job_category_id) e.currentTarget.style.background = 'transparent' }}
+                  >
+                    {c.name}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="ui-field">
