@@ -28,7 +28,7 @@ export default function EvaluationDetail() {
       supabase.from('pf_evaluations').select(`
         *,
         cycle:pf_evaluation_cycles(id, name, anonymous, status, end_date),
-        evaluatee:pf_employees!evaluatee_id(id, full_name, employee_number, role),
+        evaluatee:pf_employees!evaluatee_id(id, full_name, employee_number, role, email),
         evaluator:pf_employees!evaluator_id(id, full_name, employee_number, email),
         answers:pf_evaluation_answers(id, criteria_id, score)
       `).eq('id', id).single(),
@@ -78,11 +78,13 @@ export default function EvaluationDetail() {
     const endDate = cycle?.end_date
       ? new Date(cycle.end_date + 'T00:00:00').toLocaleDateString('pt-PT')
       : '—'
+    // Self-evaluation: send to the evaluatee; peer/manager: send to the evaluator
+    const recipient = evaluation.type === 'self' ? evaluatee : evaluator
     const subject = encodeURIComponent(`Avaliação de Desempenho - ${evaluatee?.full_name ?? ''}`)
     const body = encodeURIComponent(
-      `Olá ${evaluator?.full_name ?? ''},\n\nFoi gerada a sua avaliação de desempenho referente ao ciclo ${cycle?.name ?? ''}. Por favor aceda ao link abaixo para preencher o questionário até ${endDate}.\n\n${link}`
+      `Olá ${recipient?.full_name ?? ''},\n\nFoi gerada a sua avaliação de desempenho referente ao ciclo ${cycle?.name ?? ''}. Por favor aceda ao link abaixo para preencher o questionário até ${endDate}.\n\n${link}`
     )
-    window.open(`mailto:${evaluator?.email ?? ''}?subject=${subject}&body=${body}`)
+    window.open(`mailto:${recipient?.email ?? ''}?subject=${subject}&body=${body}`)
   }
 
   const handleSubmit = async ({ scores, notes }) => {

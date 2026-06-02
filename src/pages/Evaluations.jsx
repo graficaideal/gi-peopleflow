@@ -123,11 +123,13 @@ export default function Evaluations() {
     const endDate = cycle?.end_date
       ? new Date(cycle.end_date + 'T00:00:00').toLocaleDateString('pt-PT')
       : '—'
+    // Self-evaluation: send to the evaluatee; peer/manager: send to the evaluator
+    const recipient = ev.type === 'self' ? evaluatee : evaluator
     const subject = encodeURIComponent(`Avaliação de Desempenho - ${evaluatee?.full_name ?? ''}`)
     const body = encodeURIComponent(
-      `Olá ${evaluator?.full_name ?? ''},\n\nFoi gerada a sua avaliação de desempenho referente ao ciclo ${cycle?.name ?? ''}. Por favor aceda ao link abaixo para preencher o questionário até ${endDate}.\n\n${link}`
+      `Olá ${recipient?.full_name ?? ''},\n\nFoi gerada a sua avaliação de desempenho referente ao ciclo ${cycle?.name ?? ''}. Por favor aceda ao link abaixo para preencher o questionário até ${endDate}.\n\n${link}`
     )
-    window.open(`mailto:${evaluator?.email ?? ''}?subject=${subject}&body=${body}`)
+    window.open(`mailto:${recipient?.email ?? ''}?subject=${subject}&body=${body}`)
   }
 
   const isAnonymousPeer = (ev) =>

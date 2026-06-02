@@ -14,7 +14,7 @@ export function useEvaluations() {
       .select(`
         id, type, status, submitted_at, cycle_id, created_at, token, token_expires_at,
         cycle:pf_evaluation_cycles(id, name, anonymous, end_date),
-        evaluatee:pf_employees!evaluatee_id(id, full_name, employee_number),
+        evaluatee:pf_employees!evaluatee_id(id, full_name, employee_number, email),
         evaluator:pf_employees!evaluator_id(id, full_name, employee_number, email)
       `)
       .order('created_at', { ascending: false })
