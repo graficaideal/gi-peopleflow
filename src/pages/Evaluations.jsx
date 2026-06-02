@@ -65,6 +65,7 @@ export default function Evaluations() {
   const [localChanges, setLocalChanges] = useState({})
   const [copiedId, setCopiedId]         = useState(null)
   const [busyIds, setBusyIds]           = useState(new Set())
+  const [sentConfirmEv, setSentConfirmEv] = useState(null)
 
   const applyChange = (id, patch) =>
     setLocalChanges(prev => ({ ...prev, [id]: { ...(prev[id] ?? {}), ...patch } }))
@@ -158,6 +159,22 @@ export default function Evaluations() {
     }
 
     window.open(`mailto:${recipient?.email ?? ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyText)}`)
+    setSentConfirmEv(ev)
+  }
+
+  const handleConfirmSent = async () => {
+    const ev = sentConfirmEv
+    setSentConfirmEv(null)
+    if (!ev) return
+    const s = effStatus(ev)
+    if (s === 'sent' || s === 'opened' || s === 'submitted') return
+    setBusy(ev.id, true)
+    const { error: err } = await supabase
+      .from('pf_evaluations')
+      .update({ status: 'sent' })
+      .eq('id', ev.id)
+    setBusy(ev.id, false)
+    if (!err) applyChange(ev.id, { status: 'sent' })
   }
 
   const setGroupByPersisted = (val) => { setGroupBy(val); localStorage.setItem('pf_eval_group_by', val) }
@@ -693,6 +710,41 @@ export default function Evaluations() {
           border-radius: 8px; padding: 8px 12px;
         }
         .evl-result-count { font-size: 11px; color: var(--color-text-muted); margin-bottom: 7px; padding-left: 1px; }
+
+        /* ── Sent confirm modal ── */
+        .evl-overlay {
+          position: fixed; inset: 0;
+          background: rgba(0,0,0,0.4); backdrop-filter: blur(3px);
+          display: flex; align-items: center; justify-content: center;
+          z-index: 500; padding: 24px;
+        }
+        .evl-confirm-modal {
+          background: var(--color-surface);
+          border: 1px solid var(--color-border);
+          border-radius: 14px;
+          width: 100%; max-width: 360px;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+          animation: evl-in 0.2s cubic-bezier(0.16,1,0.3,1) both;
+        }
+        .evl-confirm-body { padding: 22px 22px 18px; }
+        .evl-confirm-icon {
+          width: 40px; height: 40px; border-radius: 10px;
+          background: rgba(22,163,74,0.1); color: #16a34a;
+          display: flex; align-items: center; justify-content: center;
+          margin-bottom: 14px;
+        }
+        .evl-confirm-title { font-size: 14px; font-weight: 700; color: var(--color-text); letter-spacing: -0.1px; margin-bottom: 6px; }
+        .evl-confirm-desc  { font-size: 13px; color: var(--color-text-muted); line-height: 1.55; }
+        .evl-confirm-footer { display: flex; gap: 8px; padding: 0 22px 20px; }
+        .evl-confirm-btn {
+          flex: 1; height: 36px; border-radius: 8px;
+          font-size: 13px; font-weight: 600; font-family: 'Outfit', sans-serif;
+          cursor: pointer; transition: opacity 0.15s, background 0.15s;
+        }
+        .evl-confirm-btn-yes { background: rgba(22,163,74,0.1); color: #16a34a; border: 1px solid rgba(22,163,74,0.25); }
+        .evl-confirm-btn-yes:hover { background: rgba(22,163,74,0.18); }
+        .evl-confirm-btn-no  { background: transparent; color: var(--color-text-muted); border: 1px solid var(--color-border); }
+        .evl-confirm-btn-no:hover  { background: var(--color-hover); color: var(--color-text); }
       `}</style>
 
       <div>
@@ -830,6 +882,33 @@ export default function Evaluations() {
           </>
         )}
       </div>
+
+      {/* ── Sent confirmation modal ── */}
+      {sentConfirmEv && (
+        <div className="evl-overlay" onClick={e => e.target === e.currentTarget && setSentConfirmEv(null)}>
+          <div className="evl-confirm-modal">
+            <div className="evl-confirm-body">
+              <div className="evl-confirm-icon">
+                <Mail size={18} />
+              </div>
+              <div className="evl-confirm-title">Marcar como enviada?</div>
+              <div className="evl-confirm-desc">
+                Deseja marcar a avaliação de{' '}
+                <strong>{getEvaluatee(sentConfirmEv)?.full_name ?? '—'}</strong>{' '}
+                como enviada?
+              </div>
+            </div>
+            <div className="evl-confirm-footer">
+              <button className="evl-confirm-btn evl-confirm-btn-no" onClick={() => setSentConfirmEv(null)}>
+                Não
+              </button>
+              <button className="evl-confirm-btn evl-confirm-btn-yes" onClick={handleConfirmSent}>
+                Sim, marcar como enviada
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
