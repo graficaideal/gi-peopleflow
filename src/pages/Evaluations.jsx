@@ -145,17 +145,31 @@ export default function Evaluations() {
       : '—'
     const cycleName = cycle?.name ?? ''
 
-    let subject, bodyText
+    let subject, mainText
     if (ev.type === 'self') {
       subject  = `Avaliação de Desempenho - A sua autoavaliação`
-      bodyText = `Olá ${evaluatee?.full_name ?? ''},\n\nEstá disponível a sua autoavaliação de desempenho referente ao ciclo ${cycleName}. Por favor aceda ao link abaixo para preencher o questionário até ${endDate}.\n\n${link}`
+      mainText = `Está disponível a sua autoavaliação de desempenho referente ao ciclo ${cycleName}.\nPor favor aceda ao link abaixo para preencher o questionário.`
     } else if (ev.type === 'peer') {
       subject  = `Avaliação de Desempenho - Avaliação de colega`
-      bodyText = `Olá ${evaluator?.full_name ?? ''},\n\nFoi-lhe atribuída a avaliação de desempenho do/a ${evaluatee?.full_name ?? ''} referente ao ciclo ${cycleName}. Por favor aceda ao link abaixo para preencher o questionário até ${endDate}.\n\n${link}`
+      mainText = `Foi-lhe atribuída a avaliação de desempenho do/a ${evaluatee?.full_name ?? ''} referente ao ciclo ${cycleName}.\nPor favor aceda ao link abaixo para preencher o questionário.`
     } else {
       subject  = `Avaliação de Desempenho - Avaliação da sua equipa`
-      bodyText = `Olá ${evaluator?.full_name ?? ''},\n\nFoi-lhe atribuída a avaliação de desempenho do/a ${evaluatee?.full_name ?? ''} referente ao ciclo ${cycleName}. Por favor aceda ao link abaixo para preencher o questionário até ${endDate}.\n\n${link}`
+      mainText = `Foi-lhe atribuída a avaliação de desempenho do/a ${evaluatee?.full_name ?? ''} referente ao ciclo ${cycleName}.\nPor favor aceda ao link abaixo para preencher o questionário.`
     }
+
+    const SEP = '━━━━━━━━━━━━━━━━━━━━'
+    const bodyText = [
+      `Olá ${recipient?.full_name ?? ''},`,
+      '',
+      mainText,
+      '',
+      SEP,
+      'LINK DE ACESSO:',
+      link,
+      SEP,
+      '',
+      `Validade: ${endDate}`,
+    ].join('\n')
 
     window.open(`mailto:${recipient?.email ?? ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyText)}`)
     setSentConfirmEv(ev)
