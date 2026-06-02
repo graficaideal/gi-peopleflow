@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ClipboardList, Search, X, Mail, Link2, MailOpen, Eye, EyeOff } from 'lucide-react'
+import { ClipboardList, Search, X, Mail, Link2, MailOpen, Eye, EyeOff, List, Users, Tag } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useEvaluations } from '../hooks/useEvaluations'
 import { useCycles } from '../hooks/useCycles'
@@ -36,6 +36,12 @@ const STATUS_FILTERS = [
   { value: 'sent',      label: 'Enviadas' },
   { value: 'opened',    label: 'Abertas' },
   { value: 'submitted', label: 'Concluídas' },
+]
+
+const GROUPBY_OPTIONS = [
+  { value: 'none',     icon: List,  label: 'Lista' },
+  { value: 'employee', icon: Users, label: 'Colaborador' },
+  { value: 'type',     icon: Tag,   label: 'Tipo' },
 ]
 
 export default function Evaluations() {
@@ -185,8 +191,12 @@ export default function Evaluations() {
     return c
   }, [evaluations, localChanges])
 
+  // Number of columns depends on groupBy (name col hidden in 'employee', type col hidden in 'employee'+'type')
+  const colSpan = groupBy === 'none' ? 6 : 5
+
   const renderRow = (ev, i) => {
     const evaluatee  = getEvaluatee(ev)
+    const evaluator  = getEvaluator(ev)
     const cycle      = getCycle(ev)
     const es         = effStatus(ev)
     const stCfg      = STATUS_CFG[es] ?? STATUS_CFG.pending
@@ -195,38 +205,60 @@ export default function Evaluations() {
     const isCopied   = copiedId === ev.id
     const isSent     = es !== 'pending'
     const canToggle  = es === 'pending' || es === 'sent'
+    const isCompleted = es === 'submitted'
     const hasEmail   = !!getRecipient(ev)?.email
     const initials   = (evaluatee?.full_name ?? '?').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
+    const isAnon     = ev.type === 'peer' && (Array.isArray(ev.cycle) ? ev.cycle[0] : ev.cycle)?.anonymous
+    const evalName   = isAnon ? null : evaluator?.full_name ?? null
 
     return (
       <tr
         key={ev.id}
-        className="evl-tr"
+        className={`evl-tr${isCompleted ? ' evl-tr-done' : ''}`}
         onClick={() => navigate(`/evaluations/${ev.id}`)}
         style={{ animationDelay: `${Math.min(i, 40) * 0.012}s` }}
       >
-        <td className="evl-td evl-td-name">
-          <div className="evl-name-cell">
-            <div className="evl-avatar">{initials}</div>
-            <div className="evl-name-info">
-              <div className="evl-full-name">{evaluatee?.full_name ?? '—'}</div>
-              {evaluatee?.employee_number && (
-                <div className="evl-emp-num">#{evaluatee.employee_number}</div>
+        {/* Col 1: context-aware */}
+        {groupBy === 'employee' ? (
+          <td className="evl-td">
+            <div className="evl-type-main">
+              <span className="evl-type-badge" style={{ background: tyCfg.bg, color: tyCfg.color }}>
+                {tyCfg.label}
+              </span>
+              {ev.type !== 'self' && evalName && (
+                <span className="evl-eval-hint">{evalName}</span>
               )}
             </div>
-          </div>
-        </td>
+          </td>
+        ) : (
+          <td className="evl-td evl-td-name">
+            <div className="evl-name-cell">
+              <div className="evl-avatar">{initials}</div>
+              <div className="evl-name-info">
+                <div className="evl-full-name">{evaluatee?.full_name ?? '—'}</div>
+                {evaluatee?.employee_number && (
+                  <div className="evl-emp-num">#{evaluatee.employee_number}</div>
+                )}
+              </div>
+            </div>
+          </td>
+        )}
 
-        <td className="evl-td">
-          <span className="evl-type-badge" style={{ background: tyCfg.bg, color: tyCfg.color }}>
-            {tyCfg.label}
-          </span>
-        </td>
+        {/* Col 2: type badge — only in 'none' grouping */}
+        {groupBy === 'none' && (
+          <td className="evl-td">
+            <span className="evl-type-badge" style={{ background: tyCfg.bg, color: tyCfg.color }}>
+              {tyCfg.label}
+            </span>
+          </td>
+        )}
 
+        {/* Cycle */}
         <td className="evl-td evl-td-cycle">
           <span className="evl-cycle-name">{cycle?.name ?? '—'}</span>
         </td>
 
+        {/* Status */}
         <td className="evl-td">
           <span className="evl-status" style={{ '--sc': stCfg.color }}>
             <span className="evl-dot" />
@@ -234,6 +266,7 @@ export default function Evaluations() {
           </span>
         </td>
 
+        {/* Sent toggle */}
         <td className="evl-td evl-td-center" onClick={e => e.stopPropagation()}>
           <button
             className={`evl-sent-btn${isSent ? ' on' : ''}${!canToggle ? ' fixed' : ''}`}
@@ -245,6 +278,7 @@ export default function Evaluations() {
           </button>
         </td>
 
+        {/* Actions */}
         <td className="evl-td evl-td-actions" onClick={e => e.stopPropagation()}>
           {hasEmail && (
             <div className="evl-act-wrap">
@@ -252,7 +286,7 @@ export default function Evaluations() {
                 className={`evl-act-btn${isCopied ? ' copied' : ''}`}
                 onClick={(e) => handleLinkAction(e, ev)}
                 disabled={isBusy}
-                title={isCopied ? 'Copiado!' : 'Copiar link de avaliação'}
+                title={isCopied ? 'Copiado!' : 'Copiar link'}
               >
                 <Link2 size={13} />
               </button>
@@ -260,7 +294,7 @@ export default function Evaluations() {
                 className="evl-act-btn"
                 onClick={(e) => handleEmailAction(e, ev)}
                 disabled={isBusy}
-                title="Enviar email com link"
+                title="Enviar email"
               >
                 <MailOpen size={13} />
               </button>
@@ -271,24 +305,73 @@ export default function Evaluations() {
     )
   }
 
-  const tableRows = grouped.flatMap(group => {
-    const rows = group.items.map((ev, i) => renderRow(ev, i))
-    if (group.label === null) return rows
-    return [
+  const renderGroupHeader = (group) => {
+    if (group.label === null) return null
+
+    if (groupBy === 'employee') {
+      // Rich header: avatar + name + number + per-type status summary
+      const sample     = getEvaluatee(group.items[0])
+      const empNum     = sample?.employee_number
+      const initials   = group.label.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
+      const summary    = group.items
+        .slice()
+        .sort((a, b) => (TYPE_ORDER[a.type] ?? 99) - (TYPE_ORDER[b.type] ?? 99))
+        .map(ev => ({
+          type: ev.type,
+          tc:   TYPE_CFG[ev.type]   ?? TYPE_CFG.self,
+          sc:   STATUS_CFG[effStatus(ev)] ?? STATUS_CFG.pending,
+        }))
+
+      return (
+        <tr key={`g-${group.key}`} className="evl-group-tr evl-group-tr-emp">
+          <td colSpan={colSpan} className="evl-group-td">
+            <div className="evl-group-emp-row">
+              <div className="evl-group-avatar">{initials}</div>
+              <div className="evl-group-info">
+                <span className="evl-group-name">{group.label}</span>
+                {empNum && <span className="evl-group-empnum">#{empNum}</span>}
+              </div>
+              <div className="evl-group-summary">
+                {summary.map(s => (
+                  <span key={s.type} className="evl-gs-pill">
+                    <span className="evl-gs-dot" style={{ background: s.sc.color }} title={s.sc.label} />
+                    <span style={{ color: s.tc.color }}>{s.tc.label}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </td>
+        </tr>
+      )
+    }
+
+    // Type grouping: simple label + count
+    return (
       <tr key={`g-${group.key}`} className="evl-group-tr">
-        <td colSpan={6} className="evl-group-td">
-          <span className="evl-group-label">{group.label}</span>
+        <td colSpan={colSpan} className="evl-group-td">
+          {groupBy === 'type' && (
+            <span
+              className="evl-type-badge evl-group-type-badge"
+              style={{ background: TYPE_CFG[group.key]?.bg ?? 'var(--color-hover)', color: TYPE_CFG[group.key]?.color ?? 'var(--color-text)' }}
+            >
+              {group.label}
+            </span>
+          )}
+          {groupBy !== 'type' && <span className="evl-group-label">{group.label}</span>}
           <span className="evl-group-cnt">{group.items.length}</span>
         </td>
-      </tr>,
-      ...rows,
-    ]
-  })
+      </tr>
+    )
+  }
+
+  const tableRows = grouped.flatMap(group => [
+    ...(group.label !== null ? [renderGroupHeader(group)] : []),
+    ...group.items.map((ev, i) => renderRow(ev, i)),
+  ])
 
   return (
     <>
       <style>{`
-        /* ── Animations ── */
         @keyframes evl-in {
           from { opacity: 0; transform: translateY(4px); }
           to   { opacity: 1; transform: translateY(0); }
@@ -298,317 +381,274 @@ export default function Evaluations() {
           to   { transform: translateX(200%); }
         }
 
-        /* ── Toolbar ── */
-        .evl-toolbar {
+        /* ── Header + stats ── */
+        .evl-page-header {
           display: flex;
-          gap: 8px;
-          align-items: center;
-          flex-wrap: wrap;
+          align-items: baseline;
+          gap: 16px;
           margin-bottom: 14px;
+          flex-wrap: wrap;
+        }
+        .evl-stats {
+          display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+          margin-left: auto;
+        }
+        .evl-stat {
+          display: flex; align-items: center; gap: 4px;
+          font-size: 11px; font-weight: 500;
+          cursor: pointer;
+          padding: 2px 6px; border-radius: 5px;
+          transition: background 0.12s;
+        }
+        .evl-stat:hover { background: var(--color-hover); }
+        .evl-stat.active-filter { background: var(--color-hover); }
+        .evl-stat-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+        .evl-stat-num { font-weight: 700; }
+        .evl-stat-lbl { color: var(--color-text-muted); }
+
+        /* ── Toolbar row 1: filters ── */
+        .evl-filters {
+          display: flex; gap: 7px; align-items: center;
+          flex-wrap: wrap; margin-bottom: 8px;
         }
         .evl-search-wrap {
-          position: relative;
-          display: flex;
-          align-items: center;
-          flex: 1;
-          min-width: 180px;
-          max-width: 260px;
+          position: relative; display: flex; align-items: center;
+          min-width: 180px; max-width: 240px; flex: 1;
         }
         .evl-search-ico {
-          position: absolute;
-          left: 10px;
-          color: var(--color-text-muted);
-          pointer-events: none;
+          position: absolute; left: 9px;
+          color: var(--color-text-muted); pointer-events: none;
         }
         .evl-search-input {
-          width: 100%;
-          height: 32px;
-          padding: 0 30px 0 32px;
+          width: 100%; height: 30px;
+          padding: 0 28px 0 30px;
           border: 1px solid var(--color-border);
-          border-radius: 8px;
+          border-radius: 7px;
           background: var(--color-surface);
           color: var(--color-text);
-          font-size: 12px;
-          font-family: 'Outfit', sans-serif;
-          outline: none;
-          transition: border-color 0.15s;
+          font-size: 12px; font-family: 'Outfit', sans-serif;
+          outline: none; transition: border-color 0.15s;
         }
         .evl-search-input:focus { border-color: var(--color-accent); }
         .evl-search-input::placeholder { color: var(--color-text-muted); }
         .evl-search-clear {
-          position: absolute;
-          right: 7px;
-          width: 18px; height: 18px;
-          border-radius: 4px;
+          position: absolute; right: 7px;
+          width: 16px; height: 16px; border-radius: 3px;
           display: flex; align-items: center; justify-content: center;
-          color: var(--color-text-muted);
-          transition: background 0.12s;
+          color: var(--color-text-muted); transition: background 0.12s;
         }
         .evl-search-clear:hover { background: var(--color-hover); }
-
         .evl-sel {
-          height: 32px;
-          padding: 0 9px;
-          border: 1px solid var(--color-border);
-          border-radius: 8px;
-          background: var(--color-surface);
-          color: var(--color-text);
-          font-size: 12px;
-          font-family: 'Outfit', sans-serif;
-          outline: none;
-          cursor: pointer;
+          height: 30px; padding: 0 8px;
+          border: 1px solid var(--color-border); border-radius: 7px;
+          background: var(--color-surface); color: var(--color-text);
+          font-size: 12px; font-family: 'Outfit', sans-serif;
+          outline: none; cursor: pointer; max-width: 160px;
         }
         .evl-sel:focus { border-color: var(--color-accent); }
-
         .evl-tabs {
-          display: flex;
-          gap: 2px;
-          padding: 2px;
-          background: var(--color-hover);
-          border-radius: 7px;
+          display: flex; gap: 1px; padding: 2px;
+          background: var(--color-hover); border-radius: 7px;
         }
         .evl-tab {
-          padding: 3px 10px;
-          border-radius: 5px;
-          font-size: 11px;
-          font-weight: 500;
+          padding: 3px 9px; border-radius: 5px;
+          font-size: 11px; font-weight: 500;
           color: var(--color-text-muted);
-          transition: background 0.12s, color 0.12s;
-          white-space: nowrap;
+          transition: background 0.12s, color 0.12s; white-space: nowrap;
         }
         .evl-tab:hover { color: var(--color-text); }
         .evl-tab.on {
-          background: var(--color-surface);
-          color: var(--color-text);
-          box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-          font-weight: 600;
+          background: var(--color-surface); color: var(--color-text);
+          box-shadow: 0 1px 3px rgba(0,0,0,0.08); font-weight: 600;
         }
 
-        .evl-toolbar-right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+        /* ── Toolbar row 2: view controls ── */
+        .evl-viewbar {
+          display: flex; gap: 6px; align-items: center;
+          margin-bottom: 12px; flex-wrap: wrap;
+        }
+        .evl-groupby-label {
+          font-size: 11px; color: var(--color-text-muted);
+          margin-right: 2px; flex-shrink: 0;
+        }
+        .evl-groupby-btns {
+          display: flex; gap: 2px; padding: 2px;
+          background: var(--color-hover); border-radius: 7px;
+        }
+        .evl-groupby-btn {
+          padding: 3px 10px; border-radius: 5px;
+          font-size: 11px; font-weight: 500;
+          color: var(--color-text-muted);
+          display: inline-flex; align-items: center; gap: 4px;
+          transition: background 0.12s, color 0.12s; white-space: nowrap;
+        }
+        .evl-groupby-btn:hover { color: var(--color-text); }
+        .evl-groupby-btn.on {
+          background: var(--color-surface); color: var(--color-text);
+          box-shadow: 0 1px 3px rgba(0,0,0,0.08); font-weight: 600;
+        }
+        .evl-viewbar-right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
         .evl-toggle-btn {
-          height: 30px;
-          padding: 0 10px;
-          border-radius: 7px;
-          font-size: 11px;
-          font-weight: 500;
-          font-family: 'Outfit', sans-serif;
-          border: 1px solid var(--color-border);
-          background: transparent;
+          height: 28px; padding: 0 9px; border-radius: 7px;
+          font-size: 11px; font-weight: 500; font-family: 'Outfit', sans-serif;
+          border: 1px solid var(--color-border); background: transparent;
           color: var(--color-text-muted);
           display: inline-flex; align-items: center; gap: 5px;
-          cursor: pointer;
-          transition: background 0.12s, color 0.12s, border-color 0.12s;
+          cursor: pointer; transition: background 0.12s, color 0.12s, border-color 0.12s;
           white-space: nowrap;
         }
         .evl-toggle-btn:hover { background: var(--color-hover); color: var(--color-text); }
         .evl-toggle-btn.on {
-          background: rgba(224,203,75,0.08);
-          border-color: rgba(224,203,75,0.3);
-          color: #a16207;
+          background: rgba(224,203,75,0.08); border-color: rgba(224,203,75,0.3); color: #a16207;
         }
         [data-theme='dark'] .evl-toggle-btn.on { color: var(--color-accent); }
 
-        /* ── Stats strip ── */
-        .evl-stats {
-          display: flex;
-          gap: 16px;
-          align-items: center;
-          margin-bottom: 14px;
-          flex-wrap: wrap;
-        }
-        .evl-stat {
-          display: flex; align-items: center; gap: 5px;
-          font-size: 12px; font-weight: 500;
-        }
-        .evl-stat-dot {
-          width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
-        }
-        .evl-stat-num { font-weight: 700; }
-        .evl-stat-lbl { color: var(--color-text-muted); }
-
-        /* ── Table wrap ── */
+        /* ── Table ── */
         .evl-table-wrap {
           background: var(--color-surface);
           border: 1px solid var(--color-border);
-          border-radius: 12px;
-          overflow: hidden;
+          border-radius: 12px; overflow: hidden;
           animation: evl-in 0.2s ease both;
         }
-        .evl-table {
-          width: 100%;
-          border-collapse: collapse;
-          table-layout: fixed;
-        }
-
-        /* ── Header ── */
+        .evl-table { width: 100%; border-collapse: collapse; }
         .evl-thead { position: sticky; top: 0; z-index: 2; }
         .evl-th {
-          text-align: left;
-          font-size: 10px;
-          font-weight: 700;
-          color: var(--color-text-muted);
-          text-transform: uppercase;
-          letter-spacing: 0.7px;
-          padding: 10px 14px 9px;
+          text-align: left; font-size: 10px; font-weight: 700;
+          color: var(--color-text-muted); text-transform: uppercase;
+          letter-spacing: 0.7px; padding: 9px 14px 8px;
           border-bottom: 1px solid var(--color-border);
-          background: var(--color-bg);
-          white-space: nowrap;
+          background: var(--color-bg); white-space: nowrap;
         }
         .evl-th-center { text-align: center; }
         .evl-th-r      { text-align: right; }
 
-        /* Column widths */
-        .evl-col-name    { width: 30%; }
-        .evl-col-type    { width: 90px; }
-        .evl-col-cycle   { width: 20%; }
-        .evl-col-status  { width: 110px; }
-        .evl-col-sent    { width: 72px; }
-        .evl-col-actions { width: 72px; }
-
         /* ── Rows ── */
         .evl-tr {
-          cursor: pointer;
-          transition: background 0.1s;
+          cursor: pointer; transition: background 0.1s;
           animation: evl-in 0.2s ease both;
         }
         .evl-tr:hover { background: var(--color-hover); }
-        .evl-table tbody .evl-tr:not(:last-child) td { border-bottom: 1px solid var(--color-border); }
-        .evl-group-tr + .evl-tr td,
-        .evl-tr:first-child td { border-top: none; }
-
-        .evl-td {
-          padding: 9px 14px;
-          vertical-align: middle;
-          font-size: 13px;
-          color: var(--color-text);
+        .evl-tr-done { opacity: 0.62; }
+        .evl-tr-done:hover { opacity: 1; }
+        .evl-table tbody .evl-tr:not(:last-child) td,
+        .evl-table tbody .evl-tr:not(:last-child) th {
+          border-bottom: 1px solid var(--color-border);
         }
-        .evl-td-name  { padding-right: 8px; }
-        .evl-td-cycle { padding-left: 8px; padding-right: 8px; }
+
+        .evl-td { padding: 8px 14px; vertical-align: middle; font-size: 13px; color: var(--color-text); }
+        .evl-td-name   { padding-right: 8px; }
+        .evl-td-cycle  { padding-left: 8px; padding-right: 8px; max-width: 0; }
         .evl-td-center { text-align: center; padding-left: 8px; padding-right: 8px; }
         .evl-td-actions { padding-left: 8px; padding-right: 10px; text-align: right; }
 
         /* Name cell */
         .evl-name-cell { display: flex; align-items: center; gap: 9px; }
         .evl-avatar {
-          width: 28px; height: 28px;
-          border-radius: 7px;
-          background: rgba(224,203,75,0.12);
-          color: #9a8820;
-          font-size: 10px; font-weight: 700;
-          display: flex; align-items: center; justify-content: center;
-          flex-shrink: 0; letter-spacing: 0.3px;
+          width: 28px; height: 28px; border-radius: 7px;
+          background: rgba(224,203,75,0.12); color: #9a8820;
+          font-size: 10px; font-weight: 700; letter-spacing: 0.3px;
+          display: flex; align-items: center; justify-content: center; flex-shrink: 0;
         }
         [data-theme='dark'] .evl-avatar { background: rgba(224,203,75,0.09); color: var(--color-accent); }
         .evl-name-info { min-width: 0; }
-        .evl-full-name {
-          font-size: 13px; font-weight: 600;
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-        .evl-emp-num { font-size: 10px; color: var(--color-text-muted); margin-top: 1px; }
+        .evl-full-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .evl-emp-num   { font-size: 10px; color: var(--color-text-muted); margin-top: 1px; }
+
+        /* Type-primary cell (in employee grouping) */
+        .evl-type-main { display: flex; align-items: center; gap: 8px; }
+        .evl-eval-hint { font-size: 11px; color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         /* Type badge */
         .evl-type-badge {
           display: inline-flex; align-items: center;
           padding: 2px 7px; border-radius: 20px;
           font-size: 10px; font-weight: 700;
-          letter-spacing: 0.3px; text-transform: uppercase;
-          white-space: nowrap;
+          letter-spacing: 0.3px; text-transform: uppercase; white-space: nowrap; flex-shrink: 0;
         }
 
         /* Cycle */
         .evl-cycle-name {
           font-size: 12px; color: var(--color-text-muted);
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-          display: block; max-width: 100%;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;
         }
 
         /* Status */
-        .evl-status {
-          display: inline-flex; align-items: center; gap: 5px;
-          font-size: 12px; font-weight: 500;
-          color: var(--sc, #8d9190);
-        }
-        .evl-dot {
-          width: 6px; height: 6px; border-radius: 50%;
-          background: var(--sc, #8d9190); flex-shrink: 0;
-        }
+        .evl-status { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; color: var(--sc, #8d9190); }
+        .evl-dot    { width: 6px; height: 6px; border-radius: 50%; background: var(--sc, #8d9190); flex-shrink: 0; }
 
-        /* Sent toggle */
+        /* Sent button */
         .evl-sent-btn {
           width: 28px; height: 28px; border-radius: 7px;
           display: inline-flex; align-items: center; justify-content: center;
-          color: var(--color-text-muted);
-          border: 1px solid transparent;
-          transition: color 0.15s, background 0.15s, border-color 0.15s;
-          opacity: 0.45;
+          color: var(--color-text-muted); border: 1px solid transparent;
+          transition: color 0.15s, background 0.15s, border-color 0.15s; opacity: 0.4;
         }
         .evl-sent-btn:hover:not(:disabled):not(.fixed) {
-          background: var(--color-hover);
-          border-color: var(--color-border);
-          opacity: 1;
+          background: var(--color-hover); border-color: var(--color-border); opacity: 1;
         }
-        .evl-sent-btn.on {
-          color: #16a34a;
-          opacity: 1;
-        }
-        .evl-sent-btn.on:hover:not(.fixed) {
-          background: rgba(22,163,74,0.08);
-          border-color: rgba(22,163,74,0.25);
-        }
+        .evl-sent-btn.on { color: #16a34a; opacity: 1; }
+        .evl-sent-btn.on:hover:not(.fixed) { background: rgba(22,163,74,0.08); border-color: rgba(22,163,74,0.25); }
         .evl-sent-btn.fixed { cursor: default; }
         .evl-sent-btn:disabled { cursor: not-allowed; }
 
-        /* Hover actions */
-        .evl-act-wrap {
-          display: inline-flex; gap: 3px; justify-content: flex-end;
-          opacity: 0; transition: opacity 0.12s;
-        }
+        /* Action icons */
+        .evl-act-wrap { display: inline-flex; gap: 2px; justify-content: flex-end; opacity: 0; transition: opacity 0.12s; }
         .evl-tr:hover .evl-act-wrap { opacity: 1; }
         .evl-act-btn {
-          width: 28px; height: 28px; border-radius: 7px;
+          width: 27px; height: 27px; border-radius: 7px;
           display: inline-flex; align-items: center; justify-content: center;
-          color: var(--color-text-muted);
-          transition: background 0.12s, color 0.12s;
+          color: var(--color-text-muted); transition: background 0.12s, color 0.12s;
         }
         .evl-act-btn:hover:not(:disabled) { background: var(--color-hover); color: var(--color-text); }
-        .evl-act-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .evl-act-btn:disabled { opacity: 0.35; cursor: not-allowed; }
         .evl-act-btn.copied { color: #16a34a; }
 
-        /* Group rows */
+        /* ── Group rows ── */
         .evl-group-tr { background: var(--color-bg); }
         .evl-group-td {
-          padding: 7px 14px;
+          padding: 0;
           border-bottom: 1px solid var(--color-border);
-          border-top: 1px solid var(--color-border);
+          border-top: 2px solid var(--color-border);
         }
-        .evl-group-td:first-child { border-left: 3px solid var(--color-accent); }
-        .evl-group-label {
-          font-size: 11px; font-weight: 700;
-          color: var(--color-text);
-          text-transform: uppercase; letter-spacing: 0.5px;
+        /* First group header: no top border */
+        .evl-table tbody tr:first-child.evl-group-tr .evl-group-td { border-top: none; }
+
+        /* Simple group header (type grouping) */
+        .evl-group-tr:not(.evl-group-tr-emp) .evl-group-td {
+          padding: 7px 14px; border-left: 3px solid var(--color-accent);
         }
+        .evl-group-label { font-size: 11px; font-weight: 700; color: var(--color-text); text-transform: uppercase; letter-spacing: 0.5px; }
+        .evl-group-type-badge { font-size: 11px !important; padding: 3px 9px !important; }
         .evl-group-cnt {
           font-size: 10px; font-weight: 600;
           padding: 1px 7px; border-radius: 20px;
-          background: rgba(224,203,75,0.15); color: #a16207;
-          margin-left: 10px;
+          background: rgba(224,203,75,0.15); color: #a16207; margin-left: 10px;
         }
         [data-theme='dark'] .evl-group-cnt { background: rgba(224,203,75,0.1); color: var(--color-accent); }
 
-        /* Skeleton */
-        .evl-skel-wrap {
-          background: var(--color-surface);
-          border: 1px solid var(--color-border);
-          border-radius: 12px; overflow: hidden;
+        /* Rich employee group header */
+        .evl-group-tr-emp .evl-group-td { padding: 10px 14px; border-left: 3px solid var(--color-accent); }
+        .evl-group-emp-row { display: flex; align-items: center; gap: 10px; }
+        .evl-group-avatar {
+          width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+          background: rgba(224,203,75,0.14); color: #9a8820;
+          font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
+          display: flex; align-items: center; justify-content: center;
         }
-        .evl-skel-row {
-          height: 47px; position: relative; overflow: hidden;
-          border-bottom: 1px solid var(--color-border);
-        }
+        [data-theme='dark'] .evl-group-avatar { background: rgba(224,203,75,0.1); color: var(--color-accent); }
+        .evl-group-info { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+        .evl-group-name { font-size: 13px; font-weight: 700; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .evl-group-empnum { font-size: 10px; color: var(--color-text-muted); flex-shrink: 0; }
+        .evl-group-summary { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-shrink: 0; }
+        .evl-gs-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; }
+        .evl-gs-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+        /* ── Skeleton ── */
+        .evl-skel-wrap { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; overflow: hidden; }
+        .evl-skel-row { height: 44px; position: relative; overflow: hidden; border-bottom: 1px solid var(--color-border); }
         .evl-skel-row:last-child { border-bottom: none; }
         .evl-skel-row::after {
-          content: '';
-          position: absolute; inset: 0;
+          content: ''; position: absolute; inset: 0;
           background: linear-gradient(90deg, transparent, rgba(0,0,0,0.025), transparent);
           animation: evl-shimmer 1.4s infinite;
         }
@@ -616,63 +656,55 @@ export default function Evaluations() {
           background: linear-gradient(90deg, transparent, rgba(255,255,255,0.035), transparent);
         }
 
-        /* Empty / error */
+        /* ── Empty / error ── */
         .evl-empty {
-          padding: 64px 24px; text-align: center;
-          background: var(--color-surface);
-          border: 1px solid var(--color-border);
-          border-radius: 12px;
+          padding: 56px 24px; text-align: center;
+          background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px;
         }
         .evl-empty-icon {
-          width: 48px; height: 48px; border-radius: 12px;
-          background: var(--color-hover);
+          width: 46px; height: 46px; border-radius: 11px; background: var(--color-hover);
           display: flex; align-items: center; justify-content: center;
           margin: 0 auto 12px; color: var(--color-text-muted);
         }
         .evl-error {
           font-size: 12px; color: #e05252;
-          background: rgba(220,60,60,0.06);
-          border: 1px solid rgba(220,60,60,0.12);
+          background: rgba(220,60,60,0.06); border: 1px solid rgba(220,60,60,0.12);
           border-radius: 8px; padding: 8px 12px;
         }
-
-        /* Result count */
-        .evl-result-count {
-          font-size: 11px; color: var(--color-text-muted);
-          margin-bottom: 8px; padding-left: 1px;
-        }
+        .evl-result-count { font-size: 11px; color: var(--color-text-muted); margin-bottom: 7px; padding-left: 1px; }
       `}</style>
 
       <div>
-        {/* Page header */}
-        <div style={{ marginBottom: 18 }}>
-          <h1 className="page-title">Avaliações</h1>
+        {/* Page header + stats */}
+        <div className="evl-page-header">
+          <h1 className="page-title" style={{ marginBottom: 0 }}>Avaliações</h1>
+          {!loading && evaluations.length > 0 && (
+            <div className="evl-stats">
+              {Object.entries(STATUS_CFG).map(([key, cfg]) =>
+                counts[key] > 0 ? (
+                  <button
+                    key={key}
+                    className={`evl-stat${statusFilter === key ? ' active-filter' : ''}`}
+                    onClick={() => setStatusFilter(statusFilter === key ? 'all' : key)}
+                  >
+                    <span className="evl-stat-dot" style={{ background: cfg.color }} />
+                    <span className="evl-stat-num" style={{ color: cfg.color }}>{counts[key]}</span>
+                    <span className="evl-stat-lbl">{cfg.label}{counts[key] !== 1 ? 's' : ''}</span>
+                  </button>
+                ) : null
+              )}
+              <span style={{ fontSize: 11, color: 'var(--color-text-muted)', paddingLeft: 4 }}>
+                {evaluations.length} total
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Stats strip */}
-        {!loading && evaluations.length > 0 && (
-          <div className="evl-stats">
-            {Object.entries(STATUS_CFG).map(([key, cfg]) => (
-              counts[key] > 0 && (
-                <span key={key} className="evl-stat">
-                  <span className="evl-stat-dot" style={{ background: cfg.color }} />
-                  <span className="evl-stat-num" style={{ color: cfg.color }}>{counts[key]}</span>
-                  <span className="evl-stat-lbl">{cfg.label}{counts[key] !== 1 ? 's' : ''}</span>
-                </span>
-              )
-            ))}
-            <span className="evl-stat" style={{ marginLeft: 4, color: 'var(--color-text-muted)', fontSize: 11 }}>
-              {evaluations.length} total
-            </span>
-          </div>
-        )}
-
-        {/* Toolbar */}
-        {!loading && evaluations.length > 0 && (
-          <div className="evl-toolbar">
-            {/* Search */}
+        {!loading && evaluations.length > 0 && (<>
+          {/* Row 1: Filters */}
+          <div className="evl-filters">
             <div className="evl-search-wrap">
-              <Search size={13} className="evl-search-ico" />
+              <Search size={12} className="evl-search-ico" />
               <input
                 className="evl-search-input"
                 value={search}
@@ -681,61 +713,56 @@ export default function Evaluations() {
               />
               {search && (
                 <button className="evl-search-clear" onClick={() => setSearch('')}>
-                  <X size={11} />
+                  <X size={10} />
                 </button>
               )}
             </div>
-
-            {/* Cycle */}
             <select className="evl-sel" value={cycleFilter} onChange={e => setCycleFilter(e.target.value)}>
               <option value="all">Todos os ciclos</option>
               {cycles.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-
-            {/* Type tabs */}
             <div className="evl-tabs">
               {TYPE_FILTERS.map(f => (
-                <button
-                  key={f.value}
-                  className={`evl-tab${typeFilter === f.value ? ' on' : ''}`}
-                  onClick={() => setTypeFilter(f.value)}
-                >{f.label}</button>
+                <button key={f.value} className={`evl-tab${typeFilter === f.value ? ' on' : ''}`} onClick={() => setTypeFilter(f.value)}>
+                  {f.label}
+                </button>
               ))}
             </div>
-
-            {/* Status tabs */}
             <div className="evl-tabs">
               {STATUS_FILTERS.map(f => (
-                <button
-                  key={f.value}
-                  className={`evl-tab${statusFilter === f.value ? ' on' : ''}`}
-                  onClick={() => setStatusFilter(f.value)}
-                >{f.label}</button>
+                <button key={f.value} className={`evl-tab${statusFilter === f.value ? ' on' : ''}`} onClick={() => setStatusFilter(f.value)}>
+                  {f.label}
+                </button>
               ))}
             </div>
+          </div>
 
-            {/* Right controls */}
-            <div className="evl-toolbar-right">
-              <select
-                className="evl-sel"
-                value={groupBy}
-                onChange={e => setGroupByPersisted(e.target.value)}
-              >
-                <option value="none">Sem agrupamento</option>
-                <option value="employee">Por colaborador</option>
-                <option value="type">Por tipo</option>
-              </select>
-
-              <button
-                className={`evl-toggle-btn${hideSubmitted ? ' on' : ''}`}
-                onClick={toggleHideSubmitted}
-              >
-                {hideSubmitted ? <Eye size={11} /> : <EyeOff size={11} />}
+          {/* Row 2: View controls */}
+          <div className="evl-viewbar">
+            <span className="evl-groupby-label">Agrupar:</span>
+            <div className="evl-groupby-btns">
+              {GROUPBY_OPTIONS.map(opt => {
+                const Icon = opt.icon
+                return (
+                  <button
+                    key={opt.value}
+                    className={`evl-groupby-btn${groupBy === opt.value ? ' on' : ''}`}
+                    onClick={() => setGroupByPersisted(opt.value)}
+                  >
+                    <Icon size={10} />
+                    {opt.label}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="evl-viewbar-right">
+              <button className={`evl-toggle-btn${hideSubmitted ? ' on' : ''}`} onClick={toggleHideSubmitted}>
+                {hideSubmitted ? <Eye size={10} /> : <EyeOff size={10} />}
                 {hideSubmitted ? 'Mostrar concluídas' : 'Ocultar concluídas'}
               </button>
             </div>
           </div>
-        )}
+        </>)}
 
         {/* Content */}
         {loading ? (
@@ -748,9 +775,7 @@ export default function Evaluations() {
           <div className="evl-empty">
             <div className="evl-empty-icon"><ClipboardList size={20} /></div>
             <p style={{ fontWeight: 600, color: 'var(--color-text)', marginBottom: 4 }}>Sem avaliações</p>
-            <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-              As avaliações são geradas automaticamente ao ativar um ciclo.
-            </p>
+            <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>As avaliações são geradas automaticamente ao ativar um ciclo.</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="evl-empty">
@@ -764,22 +789,18 @@ export default function Evaluations() {
             )}
             <div className="evl-table-wrap">
               <table className="evl-table">
-                <colgroup>
-                  <col className="evl-col-name" />
-                  <col className="evl-col-type" />
-                  <col className="evl-col-cycle" />
-                  <col className="evl-col-status" />
-                  <col className="evl-col-sent" />
-                  <col className="evl-col-actions" />
-                </colgroup>
                 <thead className="evl-thead">
                   <tr>
-                    <th className="evl-th">Avaliado</th>
-                    <th className="evl-th">Tipo</th>
+                    <th className="evl-th" style={{ width: groupBy === 'none' ? '30%' : '26%' }}>
+                      {groupBy === 'employee' ? 'Tipo / Avaliador' : 'Avaliado'}
+                    </th>
+                    {groupBy === 'none' && (
+                      <th className="evl-th" style={{ width: 88 }}>Tipo</th>
+                    )}
                     <th className="evl-th">Ciclo</th>
-                    <th className="evl-th">Estado</th>
-                    <th className="evl-th evl-th-center">Enviado</th>
-                    <th className="evl-th evl-th-r" />
+                    <th className="evl-th" style={{ width: 108 }}>Estado</th>
+                    <th className="evl-th evl-th-center" style={{ width: 70 }}>Enviado</th>
+                    <th className="evl-th evl-th-r"     style={{ width: 70 }} />
                   </tr>
                 </thead>
                 <tbody>{tableRows}</tbody>
