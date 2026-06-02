@@ -84,19 +84,22 @@ export default function Evaluations() {
     const next = new Set(prev); v ? next.add(id) : next.delete(id); return next
   })
 
-  const generateToken = async (ev) => {
+  const generateToken = async (ev, markSent = true) => {
     const token = crypto.randomUUID()
     const cycle = getCycle(ev)
     const expiresAt = cycle?.end_date
       ? new Date(cycle.end_date + 'T23:59:59').toISOString()
       : null
+    const patch = markSent
+      ? { token, token_expires_at: expiresAt, status: 'sent' }
+      : { token, token_expires_at: expiresAt }
     setBusy(ev.id, true)
     const { error: err } = await supabase
       .from('pf_evaluations')
-      .update({ token, token_expires_at: expiresAt, status: 'sent' })
+      .update(patch)
       .eq('id', ev.id)
     setBusy(ev.id, false)
-    if (!err) { applyChange(ev.id, { status: 'sent', token, token_expires_at: expiresAt }); return token }
+    if (!err) { applyChange(ev.id, patch); return token }
     return null
   }
 
@@ -121,7 +124,7 @@ export default function Evaluations() {
     e.stopPropagation()
     if (busyIds.has(ev.id)) return
     let token = effToken(ev)
-    if (!token) { token = await generateToken(ev); if (!token) return }
+    if (!token) { token = await generateToken(ev, false); if (!token) return }
     navigator.clipboard.writeText(`${EVAL_BASE_URL}/${token}`)
     setCopiedId(ev.id)
     setTimeout(() => setCopiedId(id => id === ev.id ? null : id), 2000)
