@@ -21,16 +21,6 @@ export default function EvaluationPublic() {
   const [saving, setSaving]         = useState(false)
   const [submitError, setSubmitError] = useState('')
 
-  // Force dark mode regardless of user preference; restore on unmount
-  useEffect(() => {
-    const prev = document.documentElement.getAttribute('data-theme')
-    document.documentElement.setAttribute('data-theme', 'dark')
-    return () => {
-      if (prev) document.documentElement.setAttribute('data-theme', prev)
-      else document.documentElement.removeAttribute('data-theme')
-    }
-  }, [])
-
   const load = useCallback(async () => {
     const [evalRes, criteriaRes] = await Promise.all([
       supabase
@@ -306,7 +296,7 @@ export default function EvaluationPublic() {
         }
       `}</style>
 
-      <div className="pub-page">
+      <div className="pub-page" data-theme="dark">
         <header className="pub-header">
           <img src="/logo.svg" alt="GI" className="pub-header-logo" />
           <span className="pub-header-name">PeopleFlow</span>
