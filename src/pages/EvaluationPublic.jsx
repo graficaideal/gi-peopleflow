@@ -26,6 +26,7 @@ export default function EvaluationPublic() {
     // (bypasses RLS — works even if anon UPDATE policy is missing)
     const { error: rpcErr } = await supabase.rpc('open_evaluation_by_token', { p_token: token })
     if (rpcErr) {
+      console.error('[EvaluationPublic] RPC error:', rpcErr)
       const msg = rpcErr.message ?? ''
       if (msg.includes('expired'))           { setPageState('expired'); return }
       if (msg.includes('already_submitted')) { setPageState('already_submitted'); return }
@@ -47,7 +48,10 @@ export default function EvaluationPublic() {
       supabase.from('pf_criteria').select('*').eq('active', true).order('sort_order'),
     ])
 
-    if (evalRes.error || !evalRes.data) { setPageState('invalid'); return }
+    if (evalRes.error || !evalRes.data) {
+      console.error('[EvaluationPublic] SELECT error:', evalRes.error)
+      setPageState('invalid'); return
+    }
 
     const ev = evalRes.data
     setEvaluation(ev)

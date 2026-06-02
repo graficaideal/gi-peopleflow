@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
 const AuthContext = createContext(null)
@@ -9,6 +9,7 @@ export function AuthProvider({ children }) {
   // authorized: undefined=checking | null=no session | true=has peopleflow access
   const [authorized, setAuthorized] = useState(undefined)
   const [accessDenied, setAccessDenied] = useState(false)
+  const lastCheckedUserId = useRef(null)
 
   // Effect 1: track raw auth state only
   useEffect(() => {
@@ -28,14 +29,20 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Effect 2: verify peopleflow access whenever session changes
+  // Effect 2: verify peopleflow access when the authenticated user changes.
+  // Skips the profile check if the user ID is unchanged (token refresh, session
+  // object recreation on focus) to prevent the loading→spinner→remount cycle.
   useEffect(() => {
     if (session === undefined) return
 
     if (!session) {
+      lastCheckedUserId.current = null
       setAuthorized(null)
       return
     }
+
+    if (session.user.id === lastCheckedUserId.current) return
+    lastCheckedUserId.current = session.user.id
 
     setAuthorized(undefined) // checking…
 
