@@ -16,7 +16,12 @@ export function AuthProvider({ children }) {
       setSession(session ?? null)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // TOKEN_REFRESHED only updates the access token — user and authorization
+      // are unchanged. Updating session here would set authorized→undefined
+      // (loading), causing ProtectedRoute to unmount and remount the entire
+      // page tree every time the window regains focus.
+      if (event === 'TOKEN_REFRESHED') return
       setSession(session ?? null)
     })
 
