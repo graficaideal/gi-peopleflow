@@ -40,8 +40,7 @@ export default function EvaluationPublic() {
 
     const ev = evalRes.data
     if (ev.token_expires_at && new Date(ev.token_expires_at) < new Date()) {
-      setPageState('expired')
-      return
+      setPageState('expired'); return
     }
     if (ev.status === 'submitted') { setPageState('already_submitted'); return }
 
@@ -91,10 +90,12 @@ export default function EvaluationPublic() {
   const avg = scoreValues.length
     ? (scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length).toFixed(1)
     : null
+  const progress = criteria.length > 0 ? scoreValues.length / criteria.length : 0
 
   return (
     <>
       <style>{`
+        /* ── Base ── */
         .pub-page {
           min-height: 100vh;
           background: var(--color-bg);
@@ -102,41 +103,36 @@ export default function EvaluationPublic() {
           color: var(--color-text);
         }
 
+        /* ── Header ── */
         .pub-header {
           display: flex;
           align-items: center;
           gap: 10px;
-          padding: 16px 24px;
+          padding: 14px 20px;
           background: var(--color-surface);
           border-bottom: 1px solid var(--color-border);
           position: sticky;
           top: 0;
           z-index: 10;
         }
-        .pub-header-logo { width: 28px; height: auto; }
-        .pub-header-name {
-          font-size: 15px;
-          font-weight: 700;
-          color: var(--color-text);
-          letter-spacing: -0.3px;
-        }
-        .pub-header-dot {
-          font-size: 13px;
-          color: var(--color-text-muted);
-        }
+        .pub-header-logo { width: 26px; height: auto; flex-shrink: 0; }
+        .pub-header-name { font-size: 15px; font-weight: 700; color: var(--color-text); letter-spacing: -0.3px; }
+        .pub-header-dot  { font-size: 13px; color: var(--color-text-muted); }
 
+        /* ── Main ── */
         .pub-main {
-          max-width: 720px;
-          margin: 32px auto;
-          padding: 0 16px 64px;
+          max-width: 680px;
+          margin: 28px auto;
+          padding: 0 16px 80px;
         }
 
+        /* ── Cards ── */
         .pub-card {
           background: var(--color-surface);
           border: 1px solid var(--color-border);
           border-radius: 14px;
-          padding: 28px;
-          margin-bottom: 16px;
+          padding: 22px 24px;
+          margin-bottom: 14px;
         }
 
         .pub-section-label {
@@ -145,10 +141,38 @@ export default function EvaluationPublic() {
           color: var(--color-text-muted);
           text-transform: uppercase;
           letter-spacing: 0.6px;
-          margin-bottom: 14px;
+          margin-bottom: 4px;
         }
 
-        /* Criteria */
+        /* ── Progress bar ── */
+        .pub-progress {
+          height: 3px;
+          background: var(--color-hover);
+          border-radius: 2px;
+          margin-bottom: 18px;
+          overflow: hidden;
+        }
+        .pub-progress-fill {
+          height: 100%;
+          background: var(--color-accent);
+          border-radius: 2px;
+          transition: width 0.35s ease;
+        }
+        .pub-progress-label {
+          font-size: 11px;
+          color: var(--color-text-muted);
+          margin-bottom: 16px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .pub-progress-count {
+          font-weight: 600;
+          color: var(--color-accent);
+          font-size: 12px;
+        }
+
+        /* ── Criteria rows — desktop ── */
         .pub-cr-row {
           display: flex;
           align-items: center;
@@ -158,19 +182,23 @@ export default function EvaluationPublic() {
           border-bottom: 1px solid var(--color-border);
         }
         .pub-cr-row:last-child { border-bottom: none; }
+
         .pub-cr-label {
           font-size: 13px;
           font-weight: 500;
           color: var(--color-text);
           flex: 1;
           min-width: 0;
+          line-height: 1.4;
         }
+
         .pub-cr-scores { display: flex; gap: 5px; flex-shrink: 0; }
+
         .pub-cr-btn {
           width: 56px;
-          height: 50px;
-          border-radius: 9px;
-          border: 1px solid var(--color-border);
+          height: 52px;
+          border-radius: 10px;
+          border: 1.5px solid var(--color-border);
           background: var(--color-bg);
           display: flex;
           flex-direction: column;
@@ -178,7 +206,9 @@ export default function EvaluationPublic() {
           justify-content: center;
           gap: 2px;
           cursor: pointer;
-          transition: border-color 0.15s, background 0.15s;
+          touch-action: manipulation;
+          -webkit-tap-highlight-color: transparent;
+          transition: border-color 0.12s, background 0.12s, transform 0.1s, box-shadow 0.12s;
         }
         .pub-cr-btn:hover {
           border-color: var(--color-accent);
@@ -187,7 +217,11 @@ export default function EvaluationPublic() {
         .pub-cr-btn.selected {
           background: var(--color-accent);
           border-color: var(--color-accent);
+          transform: scale(1.04);
+          box-shadow: 0 2px 10px rgba(224,203,75,0.25);
         }
+        .pub-cr-btn:active { transform: scale(0.96); }
+
         .pub-cr-num {
           font-size: 15px;
           font-weight: 700;
@@ -195,8 +229,8 @@ export default function EvaluationPublic() {
           line-height: 1;
         }
         .pub-cr-lbl {
-          font-size: 8.5px;
-          font-weight: 500;
+          font-size: 8px;
+          font-weight: 600;
           color: var(--color-text-muted);
           text-transform: uppercase;
           letter-spacing: 0.2px;
@@ -206,25 +240,26 @@ export default function EvaluationPublic() {
         .pub-cr-btn.selected .pub-cr-num,
         .pub-cr-btn.selected .pub-cr-lbl { color: var(--color-primary); }
 
-        /* Notes */
+        /* ── Notes ── */
         .pub-textarea {
           width: 100%;
-          padding: 10px 13px;
-          border: 1px solid var(--color-border);
-          border-radius: 9px;
+          padding: 11px 13px;
+          border: 1.5px solid var(--color-border);
+          border-radius: 10px;
           background: var(--color-bg);
           color: var(--color-text);
-          font-size: 13px;
+          font-size: 14px;
           font-family: inherit;
           outline: none;
           resize: vertical;
-          line-height: 1.55;
+          line-height: 1.6;
           transition: border-color 0.15s;
+          -webkit-appearance: none;
         }
         .pub-textarea:focus { border-color: var(--color-accent); }
         .pub-textarea::placeholder { color: var(--color-text-muted); }
 
-        /* Average */
+        /* ── Average ── */
         .pub-avg-row {
           display: flex;
           align-items: center;
@@ -233,66 +268,115 @@ export default function EvaluationPublic() {
           background: var(--color-hover);
           border: 1px solid var(--color-border);
           border-radius: 10px;
-          margin-bottom: 16px;
+          margin-bottom: 14px;
         }
 
-        /* Submit */
+        /* ── Submit row ── */
+        .pub-submit-row {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+        }
         .pub-submit-btn {
-          height: 42px;
-          padding: 0 24px;
-          border-radius: 9px;
+          height: 46px;
+          padding: 0 28px;
+          border-radius: 11px;
           font-size: 14px;
-          font-weight: 600;
+          font-weight: 700;
           font-family: inherit;
           border: none;
           background: var(--color-accent);
           color: var(--color-primary);
           cursor: pointer;
-          transition: opacity 0.15s;
+          touch-action: manipulation;
+          -webkit-tap-highlight-color: transparent;
+          transition: opacity 0.15s, transform 0.1s;
+          letter-spacing: 0.1px;
         }
         .pub-submit-btn:hover:not(:disabled) { opacity: 0.88; }
-        .pub-submit-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .pub-submit-btn:active:not(:disabled) { transform: scale(0.98); }
+        .pub-submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-        /* Error */
+        /* ── Error ── */
         .pub-error {
-          font-size: 12px;
+          font-size: 13px;
           color: #e05252;
           background: rgba(220,60,60,0.08);
           border: 1px solid rgba(220,60,60,0.18);
-          border-radius: 7px;
-          padding: 8px 12px;
+          border-radius: 8px;
+          padding: 10px 14px;
           margin-bottom: 14px;
+          line-height: 1.5;
         }
 
-        /* State pages */
-        .pub-state-box { text-align: center; padding: 48px 24px; }
+        /* ── State pages ── */
+        .pub-state-box { text-align: center; padding: 48px 20px; }
         .pub-state-icon {
-          width: 56px;
-          height: 56px;
-          border-radius: 14px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin: 0 auto 16px;
-          font-size: 26px;
+          width: 60px; height: 60px; border-radius: 16px;
+          display: flex; align-items: center; justify-content: center;
+          margin: 0 auto 18px; font-size: 28px;
         }
-        .pub-state-title {
-          font-size: 18px;
-          font-weight: 700;
-          color: var(--color-text);
-          margin-bottom: 8px;
-        }
-        .pub-state-msg {
-          font-size: 14px;
-          color: var(--color-text-muted);
-          line-height: 1.6;
+        .pub-state-title { font-size: 20px; font-weight: 700; color: var(--color-text); margin-bottom: 8px; }
+        .pub-state-msg   { font-size: 14px; color: var(--color-text-muted); line-height: 1.65; }
+
+        /* ── Mobile ── */
+        @media (max-width: 600px) {
+          .pub-header { padding: 12px 16px; }
+
+          .pub-main { margin: 14px auto; padding: 0 12px 80px; }
+
+          .pub-card { padding: 18px 16px; border-radius: 12px; }
+
+          /* Stack label above score buttons */
+          .pub-cr-row {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+            padding: 16px 0;
+          }
+
+          .pub-cr-label {
+            font-size: 14px;
+            font-weight: 600;
+          }
+
+          /* 5-column grid filling card width */
+          .pub-cr-scores {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 6px;
+          }
+
+          .pub-cr-btn {
+            width: 100%;
+            height: 56px;
+            border-radius: 10px;
+            border-width: 1.5px;
+          }
+          .pub-cr-num { font-size: 17px; }
+          .pub-cr-lbl { font-size: 7.5px; display: block; letter-spacing: 0; }
+
+          /* Full-width submit */
+          .pub-submit-row {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+          }
+          .pub-submit-btn {
+            width: 100%;
+            height: 52px;
+            font-size: 15px;
+            border-radius: 12px;
+          }
+
+          .pub-avg-row { padding: 12px 14px; }
         }
 
-        @media (max-width: 560px) {
-          .pub-cr-btn { width: 44px; height: 44px; }
-          .pub-cr-num { font-size: 13px; }
+        /* Very small screens (iPhone SE, 320px) */
+        @media (max-width: 360px) {
+          .pub-cr-btn { height: 50px; }
+          .pub-cr-num { font-size: 15px; }
           .pub-cr-lbl { display: none; }
-          .pub-card { padding: 20px 16px; }
         }
       `}</style>
 
@@ -347,9 +431,9 @@ export default function EvaluationPublic() {
 
           {pageState === 'form' && evaluation && (
             <>
-              {/* Header card */}
+              {/* Info card */}
               <div className="pub-card">
-                <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.3px', marginBottom: 8 }}>
+                <h1 style={{ fontSize: 19, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.3px', marginBottom: 8 }}>
                   {evaluatee?.full_name ?? '—'}
                 </h1>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: cycle?.end_date ? 14 : 0 }}>
@@ -367,22 +451,32 @@ export default function EvaluationPublic() {
                 </div>
                 {cycle?.end_date && (
                   <div style={{
-                    padding: '10px 14px',
+                    padding: '9px 13px',
                     background: 'rgba(224,203,75,0.07)',
                     border: '1px solid rgba(224,203,75,0.18)',
                     borderRadius: 8,
                     fontSize: 12,
                     color: 'var(--color-accent)',
                   }}>
-                    Prazo para preenchimento: <strong>{formatDate(cycle.end_date)}</strong>
+                    Prazo: <strong>{formatDate(cycle.end_date)}</strong>
                   </div>
                 )}
               </div>
 
-              {/* Form */}
+              {/* Criteria form */}
               <form onSubmit={handleSubmit}>
                 <div className="pub-card">
-                  <div className="pub-section-label">Critérios de avaliação</div>
+                  {/* Progress */}
+                  <div className="pub-progress-label">
+                    <span className="pub-section-label" style={{ marginBottom: 0 }}>Critérios de avaliação</span>
+                    <span className="pub-progress-count">
+                      {scoreValues.length}/{criteria.length}
+                    </span>
+                  </div>
+                  <div className="pub-progress">
+                    <div className="pub-progress-fill" style={{ width: `${progress * 100}%` }} />
+                  </div>
+
                   {criteria.map(c => (
                     <div key={c.id} className="pub-cr-row">
                       <div className="pub-cr-label">{c.label}</div>
@@ -404,21 +498,24 @@ export default function EvaluationPublic() {
                   ))}
                 </div>
 
+                {/* Notes */}
                 <div className="pub-card">
-                  <div className="pub-section-label">Notas (opcional)</div>
+                  <div className="pub-section-label" style={{ marginBottom: 10 }}>Notas (opcional)</div>
                   <textarea
                     className="pub-textarea"
                     value={notes}
                     onChange={e => setNotes(e.target.value)}
                     placeholder="Observações adicionais…"
-                    rows={4}
+                    rows={3}
+                    autoComplete="off"
                   />
                 </div>
 
+                {/* Average */}
                 {avg !== null && (
                   <div className="pub-avg-row">
                     <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-                      Média parcial ({scoreValues.length}/{criteria.length} critérios)
+                      Média parcial
                     </span>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                       <span style={{ fontSize: 28, fontWeight: 700, color: avgColor(avg), lineHeight: 1 }}>{avg}</span>
@@ -431,7 +528,7 @@ export default function EvaluationPublic() {
 
                 {submitError && <p className="pub-error">{submitError}</p>}
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div className="pub-submit-row">
                   <button
                     type="submit"
                     className="pub-submit-btn"
@@ -440,8 +537,8 @@ export default function EvaluationPublic() {
                     {saving ? 'A submeter…' : 'Submeter Avaliação'}
                   </button>
                   {scoreValues.length < criteria.length && (
-                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-                      {scoreValues.length} de {criteria.length} critérios preenchidos
+                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)', textAlign: 'center' }}>
+                      Faltam {criteria.length - scoreValues.length} critério{criteria.length - scoreValues.length !== 1 ? 's' : ''}
                     </span>
                   )}
                 </div>
