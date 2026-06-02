@@ -87,7 +87,7 @@ export default function EvaluationPublic() {
 
     const { error: answersErr } = await supabase
       .from('pf_evaluation_answers')
-      .upsert(answers, { onConflict: 'evaluation_id,criteria_id' })
+      .insert(answers)
     if (answersErr) { setSubmitError(answersErr.message); setSaving(false); return }
 
     const { error: evalErr } = await supabase
