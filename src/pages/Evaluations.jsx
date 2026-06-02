@@ -136,17 +136,28 @@ export default function Evaluations() {
     let token = effToken(ev)
     if (!token) { token = await generateToken(ev); if (!token) return }
     const evaluatee = getEvaluatee(ev)
+    const evaluator = getEvaluator(ev)
     const cycle     = getCycle(ev)
     const recipient = getRecipient(ev)
     const link      = `${EVAL_BASE_URL}/${token}`
     const endDate   = cycle?.end_date
       ? new Date(cycle.end_date + 'T00:00:00').toLocaleDateString('pt-PT')
       : '—'
-    const subject = encodeURIComponent(`Avaliação de Desempenho - ${evaluatee?.full_name ?? ''}`)
-    const body    = encodeURIComponent(
-      `Olá ${recipient?.full_name ?? ''},\n\nFoi gerada a sua avaliação de desempenho referente ao ciclo ${cycle?.name ?? ''}. Por favor aceda ao link abaixo para preencher o questionário até ${endDate}.\n\n${link}`
-    )
-    window.open(`mailto:${recipient?.email ?? ''}?subject=${subject}&body=${body}`)
+    const cycleName = cycle?.name ?? ''
+
+    let subject, bodyText
+    if (ev.type === 'self') {
+      subject  = `Avaliação de Desempenho - A sua autoavaliação`
+      bodyText = `Olá ${evaluatee?.full_name ?? ''},\n\nEstá disponível a sua autoavaliação de desempenho referente ao ciclo ${cycleName}. Por favor aceda ao link abaixo para preencher o questionário até ${endDate}.\n\n${link}`
+    } else if (ev.type === 'peer') {
+      subject  = `Avaliação de Desempenho - Avaliação de colega`
+      bodyText = `Olá ${evaluator?.full_name ?? ''},\n\nFoi-lhe atribuída a avaliação de desempenho do/a ${evaluatee?.full_name ?? ''} referente ao ciclo ${cycleName}. Por favor aceda ao link abaixo para preencher o questionário até ${endDate}.\n\n${link}`
+    } else {
+      subject  = `Avaliação de Desempenho - Avaliação da sua equipa`
+      bodyText = `Olá ${evaluator?.full_name ?? ''},\n\nFoi-lhe atribuída a avaliação de desempenho do/a ${evaluatee?.full_name ?? ''} referente ao ciclo ${cycleName}. Por favor aceda ao link abaixo para preencher o questionário até ${endDate}.\n\n${link}`
+    }
+
+    window.open(`mailto:${recipient?.email ?? ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyText)}`)
   }
 
   const setGroupByPersisted = (val) => { setGroupBy(val); localStorage.setItem('pf_eval_group_by', val) }
