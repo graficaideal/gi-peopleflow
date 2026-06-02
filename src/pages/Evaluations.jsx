@@ -121,11 +121,10 @@ export default function Evaluations() {
     }
   }
 
-  const handleLinkAction = async (e, ev) => {
+  const handleLinkAction = (e, ev) => {
     e.stopPropagation()
-    if (busyIds.has(ev.id)) return
-    let token = effToken(ev)
-    if (!token) { token = await generateToken(ev, false); if (!token) return }
+    const token = effToken(ev)
+    if (!token) return
     navigator.clipboard.writeText(`${EVAL_BASE_URL}/${token}`)
     setCopiedId(ev.id)
     setTimeout(() => setCopiedId(id => id === ev.id ? null : id), 2000)
@@ -321,8 +320,8 @@ export default function Evaluations() {
               <button
                 className={`evl-act-btn${isCopied ? ' copied' : ''}`}
                 onClick={(e) => handleLinkAction(e, ev)}
-                disabled={isBusy}
-                title={isCopied ? 'Copiado!' : 'Copiar link'}
+                disabled={!effToken(ev)}
+                title={effToken(ev) ? (isCopied ? 'Copiado!' : 'Copiar link') : 'Gera um link primeiro'}
               >
                 <Link2 size={13} />
               </button>
