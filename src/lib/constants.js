@@ -2,12 +2,14 @@ export const EVALUATION_TYPES = {
   SELF: 'self',
   PEER: 'peer',
   MANAGER: 'manager',
+  GENERAL: 'general',
 }
 
 export const EVALUATION_TYPE_LABELS = {
   self: 'Autoavaliação',
   peer: 'Avaliação de Colega',
   manager: 'Avaliação de Chefia',
+  general: 'Avaliação Geral',
 }
 
 export const CYCLE_TYPES = {
