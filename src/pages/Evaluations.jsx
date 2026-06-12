@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ClipboardList, Search, X, Mail, Link2, MailOpen, Eye, EyeOff, List, Users, Tag, UserCheck, Copy } from 'lucide-react'
+import { ClipboardList, Search, X, Mail, Link2, MailOpen, Eye, EyeOff, List, Users, Tag, UserCheck, Copy, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useEvaluations } from '../hooks/useEvaluations'
 import { useCycles } from '../hooks/useCycles'
@@ -404,7 +404,14 @@ export default function Evaluations() {
         <div className="eva-header">
           <div className="eva-avatar">{ini}</div>
           <div>
-            <div className="eva-name">{evaluator?.full_name ?? '—'}</div>
+            <div className="eva-name">
+              {evaluator?.full_name ?? '—'}
+              {!hasEmail && (
+                <span className="eva-no-email" title="Sem email definido na ficha do colaborador">
+                  <AlertTriangle size={11} />
+                </span>
+              )}
+            </div>
             {evaluator?.employee_number && <div className="eva-num">#{evaluator.employee_number}</div>}
           </div>
           <span className="eva-badge">{items.length} avaliaç{items.length !== 1 ? 'ões' : 'ão'}</span>
@@ -413,7 +420,7 @@ export default function Evaluations() {
               className={`eva-email-btn${isEmailSent ? ' sent' : ''}${isEmailError ? ' error' : ''}`}
               onClick={() => handleSendEmail(group)}
               disabled={isEmailBusy || !hasEmail}
-              title={!hasEmail ? 'O avaliador não tem email registado' : undefined}
+              title={!hasEmail ? 'Sem email definido na ficha do colaborador' : undefined}
             >
               <Mail size={11} />
               {isEmailBusy ? 'A enviar…' : isEmailSent ? 'Enviado!' : isEmailError ? 'Erro no envio' : 'Enviar Email'}
@@ -992,7 +999,9 @@ export default function Evaluations() {
           display: flex; align-items: center; justify-content: center; flex-shrink: 0;
         }
         [data-theme='dark'] .eva-avatar { background: rgba(224,203,75,0.09); color: var(--color-accent); }
-        .eva-name { font-size: 13px; font-weight: 700; color: var(--color-text); line-height: 1.2; }
+        .eva-name { font-size: 13px; font-weight: 700; color: var(--color-text); line-height: 1.2; display: flex; align-items: center; gap: 5px; }
+        .eva-no-email { color: #ca8a04; display: inline-flex; align-items: center; flex-shrink: 0; cursor: default; }
+        [data-theme='dark'] .eva-no-email { color: #eab308; }
         .eva-num  { font-size: 10px; color: var(--color-text-muted); margin-top: 1px; }
         .eva-badge {
           font-size: 10px; font-weight: 700;
