@@ -153,17 +153,17 @@ export default function Evaluations() {
 
     let subject, mainText
     if (ev.type === 'self') {
-      subject  = `Avaliação de Desempenho - A sua autoavaliação`
-      mainText = `Está disponível a sua autoavaliação de desempenho referente ao ciclo ${cycleName}.\nPor favor aceda ao link abaixo para preencher o questionário.`
+      subject  = `Avaliação de Desempenho - A tua autoavaliação`
+      mainText = `Está disponível a tua autoavaliação de desempenho referente ao ciclo ${cycleName}.\nPor favor acede ao link abaixo para preencher o questionário.`
     } else if (ev.type === 'peer') {
       subject  = `Avaliação de Desempenho - Avaliação de colega`
-      mainText = `Foi-lhe atribuída a avaliação de desempenho do/a ${evaluatee?.full_name ?? ''} referente ao ciclo ${cycleName}.\nPor favor aceda ao link abaixo para preencher o questionário.`
+      mainText = `Foi-te atribuída a avaliação de desempenho do/a ${evaluatee?.full_name ?? ''} referente ao ciclo ${cycleName}.\nPor favor acede ao link abaixo para preencher o questionário.`
     } else if (ev.type === 'general') {
       subject  = `Avaliação de Desempenho - Avaliação Geral`
-      mainText = `Foi-lhe atribuída a avaliação geral de desempenho do/a ${evaluatee?.full_name ?? ''} referente ao ciclo ${cycleName}.\nPor favor aceda ao link abaixo para preencher o questionário.`
+      mainText = `Foi-te atribuída a avaliação geral de desempenho do/a ${evaluatee?.full_name ?? ''} referente ao ciclo ${cycleName}.\nPor favor acede ao link abaixo para preencher o questionário.`
     } else {
-      subject  = `Avaliação de Desempenho - Avaliação da sua equipa`
-      mainText = `Foi-lhe atribuída a avaliação de desempenho do/a ${evaluatee?.full_name ?? ''} referente ao ciclo ${cycleName}.\nPor favor aceda ao link abaixo para preencher o questionário.`
+      subject  = `Avaliação de Desempenho - Avaliação da tua equipa`
+      mainText = `Foi-te atribuída a avaliação de desempenho do/a ${evaluatee?.full_name ?? ''} referente ao ciclo ${cycleName}.\nPor favor acede ao link abaixo para preencher o questionário.`
     }
 
     const SEP = '━━━━━━━━━━━━━━━━━━━━'
@@ -228,16 +228,16 @@ export default function Evaluations() {
         ? new Date(cycle.end_date + 'T00:00:00').toLocaleDateString('pt-PT')
         : null
       lines.push(
-        `Tem ${n} avaliação${pl ? 'ões' : ''} de desempenho pendente${pl ? 's' : ''} referente${pl ? 's' : ''} ao ciclo ${cycle?.name ?? ''}.`,
-        `Por favor aceda aos links abaixo para preencher cada questionário${endDate ? ` até ${endDate}` : ''}.`,
+        `Tens ${n} avaliaç${pl ? 'ões' : 'ão'} de desempenho pendente${pl ? 's' : ''} referente${pl ? 's' : ''} ao ciclo ${cycle?.name ?? ''}.`,
+        `Por favor acede aos links abaixo para preencher cada questionário${endDate ? ` até ${endDate}` : ''}.`,
       )
       ces.forEach(ev => {
         lines.push('', `${EVALUATION_TYPE_LABELS[ev.type] ?? ev.type} - ${getEvaluatee(ev)?.full_name ?? '—'}`, `${EVAL_BASE_URL}/${tokenMap[ev.id] ?? ''}`)
       })
     } else {
       lines.push(
-        `Tem ${n} avaliação${pl ? 'ões' : ''} de desempenho pendente${pl ? 's' : ''}.`,
-        'Por favor aceda aos links abaixo para preencher cada questionário.',
+        `Tens ${n} avaliaç${pl ? 'ões' : 'ão'} de desempenho pendente${pl ? 's' : ''}.`,
+        'Por favor acede aos links abaixo para preencher cada questionário.',
       )
       cycleGroups.forEach(({ cycle, evals: ces }) => {
         lines.push('', `--- ${cycle?.name ?? 'Ciclo'} ---`)
@@ -363,7 +363,7 @@ export default function Evaluations() {
             <div className="eva-name">{evaluator?.full_name ?? '—'}</div>
             {evaluator?.employee_number && <div className="eva-num">#{evaluator.employee_number}</div>}
           </div>
-          <span className="eva-badge">{items.length} avaliação{items.length !== 1 ? 'ões' : ''}</span>
+          <span className="eva-badge">{items.length} avaliaç{items.length !== 1 ? 'ões' : 'ão'}</span>
           <button
             className={`eva-copy-btn${isCopied ? ' copied' : ''}`}
             onClick={() => handleCopyEvaluatorEmail(group)}
