@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ClipboardList, Search, X, Mail, Link2, MailOpen, Eye, EyeOff, List, Users, Tag } from 'lucide-react'
+import { ClipboardList, Search, X, Mail, Link2, MailOpen, Eye, EyeOff, List, Users, Tag, UserCheck, Copy } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useEvaluations } from '../hooks/useEvaluations'
 import { useCycles } from '../hooks/useCycles'
@@ -43,9 +43,10 @@ const STATUS_FILTERS = [
 ]
 
 const GROUPBY_OPTIONS = [
-  { value: 'none',     icon: List,  label: 'Lista' },
-  { value: 'employee', icon: Users, label: 'Colaborador' },
-  { value: 'type',     icon: Tag,   label: 'Tipo' },
+  { value: 'none',      icon: List,      label: 'Lista' },
+  { value: 'employee',  icon: Users,     label: 'Colaborador' },
+  { value: 'type',      icon: Tag,       label: 'Tipo' },
+  { value: 'evaluator', icon: UserCheck, label: 'Avaliador' },
 ]
 
 export default function Evaluations() {
@@ -67,7 +68,10 @@ export default function Evaluations() {
   const [localChanges, setLocalChanges] = useState({})
   const [copiedId, setCopiedId]         = useState(null)
   const [busyIds, setBusyIds]           = useState(new Set())
-  const [sentConfirmEv, setSentConfirmEv] = useState(null)
+  const [sentConfirmEv, setSentConfirmEv]         = useState(null)
+  const [evaBulkConfirm, setEvaBulkConfirm]       = useState(null)
+  const [bulkCopyBusy, setBulkCopyBusy]           = useState(new Set())
+  const [copiedEvaluatorId, setCopiedEvaluatorId] = useState(null)
 
   const applyChange = (id, patch) =>
     setLocalChanges(prev => ({ ...prev, [id]: { ...(prev[id] ?? {}), ...patch } }))
@@ -195,6 +199,74 @@ export default function Evaluations() {
     if (!err) applyChange(ev.id, { status: 'sent' })
   }
 
+  const handleCopyEvaluatorEmail = async (group) => {
+    const { key: evaluatorId, evaluator, items: evals } = group
+    setBulkCopyBusy(prev => new Set(prev).add(evaluatorId))
+
+    const tokenMap = {}
+    await Promise.all(evals.map(async ev => {
+      let token = effToken(ev)
+      if (!token) token = await generateToken(ev, false)
+      tokenMap[ev.id] = token
+    }))
+
+    const byCycle = {}
+    evals.forEach(ev => {
+      const cycle = getCycle(ev)
+      const cid = cycle?.id ?? 'none'
+      if (!byCycle[cid]) byCycle[cid] = { cycle, evals: [] }
+      byCycle[cid].evals.push(ev)
+    })
+    const cycleGroups = Object.values(byCycle)
+    const n = evals.length
+    const pl = n !== 1
+    const lines = [`Olá ${evaluator?.full_name ?? ''},`, '']
+
+    if (cycleGroups.length === 1) {
+      const { cycle, evals: ces } = cycleGroups[0]
+      const endDate = cycle?.end_date
+        ? new Date(cycle.end_date + 'T00:00:00').toLocaleDateString('pt-PT')
+        : null
+      lines.push(
+        `Tem ${n} avaliação${pl ? 'ões' : ''} de desempenho pendente${pl ? 's' : ''} referente${pl ? 's' : ''} ao ciclo ${cycle?.name ?? ''}.`,
+        `Por favor aceda aos links abaixo para preencher cada questionário${endDate ? ` até ${endDate}` : ''}.`,
+      )
+      ces.forEach(ev => {
+        lines.push('', `${EVALUATION_TYPE_LABELS[ev.type] ?? ev.type} - ${getEvaluatee(ev)?.full_name ?? '—'}`, `${EVAL_BASE_URL}/${tokenMap[ev.id] ?? ''}`)
+      })
+    } else {
+      lines.push(
+        `Tem ${n} avaliação${pl ? 'ões' : ''} de desempenho pendente${pl ? 's' : ''}.`,
+        'Por favor aceda aos links abaixo para preencher cada questionário.',
+      )
+      cycleGroups.forEach(({ cycle, evals: ces }) => {
+        lines.push('', `--- ${cycle?.name ?? 'Ciclo'} ---`)
+        ces.forEach(ev => {
+          lines.push('', `${EVALUATION_TYPE_LABELS[ev.type] ?? ev.type} - ${getEvaluatee(ev)?.full_name ?? '—'}`, `${EVAL_BASE_URL}/${tokenMap[ev.id] ?? ''}`)
+        })
+      })
+    }
+
+    await navigator.clipboard.writeText(lines.join('\n'))
+    setBulkCopyBusy(prev => { const s = new Set(prev); s.delete(evaluatorId); return s })
+    setCopiedEvaluatorId(evaluatorId)
+    setTimeout(() => setCopiedEvaluatorId(id => id === evaluatorId ? null : id), 2000)
+    setEvaBulkConfirm({ evaluatorId, evals })
+  }
+
+  const handleBulkMarkSent = async () => {
+    if (!evaBulkConfirm) return
+    const { evals } = evaBulkConfirm
+    setEvaBulkConfirm(null)
+    const ids = evals.filter(ev => (localChanges[ev.id]?.status ?? ev.status) === 'pending').map(ev => ev.id)
+    if (!ids.length) return
+    const { error: err } = await supabase
+      .from('pf_evaluations')
+      .update({ status: 'sent' })
+      .in('id', ids)
+    if (!err) ids.forEach(id => applyChange(id, { status: 'sent' }))
+  }
+
   const setGroupByPersisted = (val) => { setGroupBy(val); localStorage.setItem('pf_eval_group_by', val) }
   const toggleHideSubmitted = () => {
     const next = !hideSubmitted; setHideSubmitted(next); localStorage.setItem('pf_hide_submitted', String(next))
@@ -220,6 +292,7 @@ export default function Evaluations() {
   }, [evaluations, localChanges, cycleFilter, typeFilter, statusFilter, hideSubmitted, search])
 
   const grouped = useMemo(() => {
+    if (groupBy === 'evaluator') return []
     if (groupBy === 'none') return [{ key: 'all', label: null, items: filtered }]
     const map = {}
     filtered.forEach(ev => {
@@ -244,6 +317,85 @@ export default function Evaluations() {
     evaluations.forEach(ev => { const s = localChanges[ev.id]?.status ?? ev.status; if (s in c) c[s]++ })
     return c
   }, [evaluations, localChanges])
+
+  const evaluatorGroupFiltered = useMemo(() => {
+    if (groupBy !== 'evaluator') return []
+    let list = evaluations
+    if (cycleFilter !== 'all') list = list.filter(e => e.cycle_id === cycleFilter)
+    if (typeFilter !== 'all')  list = list.filter(e => e.type === typeFilter)
+    if (search.trim()) {
+      const q = search.trim().toLowerCase()
+      list = list.filter(e => {
+        const er = getEvaluator(e)
+        return er?.full_name?.toLowerCase().includes(q) || er?.employee_number?.toLowerCase().includes(q)
+      })
+    }
+    return list.filter(e => {
+      const s = localChanges[e.id]?.status ?? e.status
+      return s === 'pending' || s === 'sent'
+    })
+  }, [evaluations, localChanges, groupBy, cycleFilter, typeFilter, search])
+
+  const evaluatorGroups = useMemo(() => {
+    if (groupBy !== 'evaluator') return []
+    const map = {}
+    evaluatorGroupFiltered.forEach(ev => {
+      const evaluator = getEvaluator(ev)
+      const key = evaluator?.id ?? 'unknown'
+      if (!map[key]) map[key] = { key, evaluator, items: [] }
+      map[key].items.push(ev)
+    })
+    return Object.values(map).sort((a, b) =>
+      (a.evaluator?.full_name ?? '').localeCompare(b.evaluator?.full_name ?? '', 'pt')
+    )
+  }, [evaluatorGroupFiltered, groupBy])
+
+  const renderEvaluatorCard = (group) => {
+    const { key: evaluatorId, evaluator, items } = group
+    const isBusy = bulkCopyBusy.has(evaluatorId)
+    const isCopied = copiedEvaluatorId === evaluatorId
+    const ini = (evaluator?.full_name ?? '?').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
+    return (
+      <div key={evaluatorId} className="eva-card">
+        <div className="eva-header">
+          <div className="eva-avatar">{ini}</div>
+          <div>
+            <div className="eva-name">{evaluator?.full_name ?? '—'}</div>
+            {evaluator?.employee_number && <div className="eva-num">#{evaluator.employee_number}</div>}
+          </div>
+          <span className="eva-badge">{items.length} avaliação{items.length !== 1 ? 'ões' : ''}</span>
+          <button
+            className={`eva-copy-btn${isCopied ? ' copied' : ''}`}
+            onClick={() => handleCopyEvaluatorEmail(group)}
+            disabled={isBusy}
+          >
+            {isBusy
+              ? <span style={{ fontSize: 11 }}>A gerar links…</span>
+              : isCopied
+                ? <><Copy size={11} /> Copiado!</>
+                : <><Copy size={11} /> Copiar Email</>}
+          </button>
+        </div>
+        <div className="eva-evals">
+          {items.map(ev => {
+            const evaluatee = getEvaluatee(ev)
+            const s   = localChanges[ev.id]?.status ?? ev.status
+            const sc  = STATUS_CFG[s] ?? STATUS_CFG.pending
+            const tc  = TYPE_CFG[ev.type] ?? TYPE_CFG.self
+            return (
+              <div key={ev.id} className="eva-eval-row" onClick={() => navigate(`/evaluations/${ev.id}`)}>
+                <span className="evl-type-badge" style={{ background: tc.bg, color: tc.color }}>{tc.label}</span>
+                <span className="eva-eval-name">{evaluatee?.full_name ?? '—'}</span>
+                <span className="eva-eval-status" style={{ '--sc': sc.color }}>
+                  <span className="eva-eval-dot" />{sc.label}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
 
   // Number of columns depends on groupBy (name col hidden in 'employee', type col hidden in 'employee'+'type')
   const colSpan = groupBy === 'none' ? 6 : 5
@@ -763,6 +915,64 @@ export default function Evaluations() {
         .evl-confirm-btn-yes:hover { background: rgba(22,163,74,0.18); }
         .evl-confirm-btn-no  { background: transparent; color: var(--color-text-muted); border: 1px solid var(--color-border); }
         .evl-confirm-btn-no:hover  { background: var(--color-hover); color: var(--color-text); }
+
+        /* ── Evaluator view ── */
+        .eva-list { display: flex; flex-direction: column; gap: 10px; }
+        .eva-card {
+          background: var(--color-surface);
+          border: 1px solid var(--color-border);
+          border-radius: 12px; overflow: hidden;
+          animation: evl-in 0.2s ease both;
+        }
+        .eva-header {
+          display: flex; align-items: center; gap: 10px;
+          padding: 11px 16px;
+          border-bottom: 1px solid var(--color-border);
+          background: var(--color-bg);
+        }
+        .eva-avatar {
+          width: 32px; height: 32px; border-radius: 8px;
+          background: rgba(224,203,75,0.12); color: #9a8820;
+          font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
+          display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        [data-theme='dark'] .eva-avatar { background: rgba(224,203,75,0.09); color: var(--color-accent); }
+        .eva-name { font-size: 13px; font-weight: 700; color: var(--color-text); line-height: 1.2; }
+        .eva-num  { font-size: 10px; color: var(--color-text-muted); margin-top: 1px; }
+        .eva-badge {
+          font-size: 10px; font-weight: 700;
+          padding: 2px 8px; border-radius: 20px;
+          background: rgba(224,203,75,0.15); color: #a16207;
+          white-space: nowrap;
+        }
+        [data-theme='dark'] .eva-badge { background: rgba(224,203,75,0.1); color: var(--color-accent); }
+        .eva-copy-btn {
+          margin-left: auto; height: 30px; padding: 0 11px; border-radius: 7px;
+          font-size: 11px; font-weight: 600; font-family: 'Outfit', sans-serif;
+          border: 1px solid var(--color-border); background: transparent;
+          color: var(--color-text-muted);
+          display: inline-flex; align-items: center; gap: 5px;
+          cursor: pointer; transition: background 0.12s, color 0.12s, border-color 0.12s;
+          white-space: nowrap; flex-shrink: 0;
+        }
+        .eva-copy-btn:hover:not(:disabled) { background: var(--color-hover); color: var(--color-text); }
+        .eva-copy-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .eva-copy-btn.copied { background: rgba(22,163,74,0.08); border-color: rgba(22,163,74,0.25); color: #16a34a; }
+        .eva-evals { padding: 2px 0; }
+        .eva-eval-row {
+          display: flex; align-items: center; gap: 10px;
+          padding: 8px 16px; font-size: 13px;
+          border-bottom: 1px solid var(--color-border);
+          cursor: pointer; transition: background 0.1s;
+        }
+        .eva-eval-row:last-child { border-bottom: none; }
+        .eva-eval-row:hover { background: var(--color-hover); }
+        .eva-eval-name { flex: 1; color: var(--color-text); font-size: 12px; font-weight: 500; }
+        .eva-eval-status {
+          display: inline-flex; align-items: center; gap: 4px;
+          font-size: 11px; font-weight: 500; color: var(--sc, #8d9190); flex-shrink: 0;
+        }
+        .eva-eval-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--sc, #8d9190); }
       `}</style>
 
       <div>
@@ -868,38 +1078,71 @@ export default function Evaluations() {
             <p style={{ fontWeight: 600, color: 'var(--color-text)', marginBottom: 4 }}>Sem avaliações</p>
             <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>As avaliações são geradas automaticamente ao ativar um ciclo.</p>
           </div>
-        ) : filtered.length === 0 ? (
+        ) : (groupBy === 'evaluator' ? evaluatorGroups.length === 0 : filtered.length === 0) ? (
           <div className="evl-empty">
-            <p style={{ fontWeight: 600, color: 'var(--color-text)', marginBottom: 4 }}>Sem resultados</p>
+            <p style={{ fontWeight: 600, color: 'var(--color-text)', marginBottom: 4 }}>
+              {groupBy === 'evaluator' ? 'Sem avaliações pendentes' : 'Sem resultados'}
+            </p>
             <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Tenta ajustar os filtros.</p>
           </div>
         ) : (
           <>
-            {(search || cycleFilter !== 'all' || typeFilter !== 'all' || statusFilter !== 'all') && (
+            {groupBy !== 'evaluator' && (search || cycleFilter !== 'all' || typeFilter !== 'all' || statusFilter !== 'all') && (
               <div className="evl-result-count">{filtered.length} resultado{filtered.length !== 1 ? 's' : ''}</div>
             )}
-            <div className="evl-table-wrap">
-              <table className="evl-table">
-                <thead className="evl-thead">
-                  <tr>
-                    <th className="evl-th" style={{ width: groupBy === 'none' ? '30%' : '26%' }}>
-                      {groupBy === 'employee' ? 'Tipo / Avaliador' : 'Avaliado'}
-                    </th>
-                    {groupBy === 'none' && (
-                      <th className="evl-th" style={{ width: 88 }}>Tipo</th>
-                    )}
-                    <th className="evl-th">Ciclo</th>
-                    <th className="evl-th" style={{ width: 108 }}>Estado</th>
-                    <th className="evl-th evl-th-center" style={{ width: 70 }}>Enviado</th>
-                    <th className="evl-th evl-th-r"     style={{ width: 70 }} />
-                  </tr>
-                </thead>
-                <tbody>{tableRows}</tbody>
-              </table>
-            </div>
+            {groupBy === 'evaluator' ? (
+              <div className="eva-list">
+                {evaluatorGroups.map(group => renderEvaluatorCard(group))}
+              </div>
+            ) : (
+              <div className="evl-table-wrap">
+                <table className="evl-table">
+                  <thead className="evl-thead">
+                    <tr>
+                      <th className="evl-th" style={{ width: groupBy === 'none' ? '30%' : '26%' }}>
+                        {groupBy === 'employee' ? 'Tipo / Avaliador' : 'Avaliado'}
+                      </th>
+                      {groupBy === 'none' && (
+                        <th className="evl-th" style={{ width: 88 }}>Tipo</th>
+                      )}
+                      <th className="evl-th">Ciclo</th>
+                      <th className="evl-th" style={{ width: 108 }}>Estado</th>
+                      <th className="evl-th evl-th-center" style={{ width: 70 }}>Enviado</th>
+                      <th className="evl-th evl-th-r"     style={{ width: 70 }} />
+                    </tr>
+                  </thead>
+                  <tbody>{tableRows}</tbody>
+                </table>
+              </div>
+            )}
           </>
         )}
       </div>
+
+      {/* ── Bulk sent confirmation modal ── */}
+      {evaBulkConfirm && (
+        <div className="evl-overlay" onClick={e => e.target === e.currentTarget && setEvaBulkConfirm(null)}>
+          <div className="evl-confirm-modal">
+            <div className="evl-confirm-body">
+              <div className="evl-confirm-icon">
+                <Mail size={18} />
+              </div>
+              <div className="evl-confirm-title">Marcar como enviadas?</div>
+              <div className="evl-confirm-desc">
+                Deseja marcar as {evaBulkConfirm.evals.filter(ev => (localChanges[ev.id]?.status ?? ev.status) === 'pending').length} avaliações pendentes como enviadas?
+              </div>
+            </div>
+            <div className="evl-confirm-footer">
+              <button className="evl-confirm-btn evl-confirm-btn-no" onClick={() => setEvaBulkConfirm(null)}>
+                Não
+              </button>
+              <button className="evl-confirm-btn evl-confirm-btn-yes" onClick={handleBulkMarkSent}>
+                Sim, marcar como enviadas
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Sent confirmation modal ── */}
       {sentConfirmEv && (
