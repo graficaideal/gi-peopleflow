@@ -72,6 +72,9 @@ export default function Evaluations() {
   const [evaBulkConfirm, setEvaBulkConfirm]       = useState(null)
   const [bulkCopyBusy, setBulkCopyBusy]           = useState(new Set())
   const [copiedEvaluatorId, setCopiedEvaluatorId] = useState(null)
+  const [emailBusyIds, setEmailBusyIds]           = useState(new Set())
+  const [emailSentIds, setEmailSentIds]           = useState(new Set())
+  const [emailErrorIds, setEmailErrorIds]         = useState(new Set())
 
   const applyChange = (id, patch) =>
     setLocalChanges(prev => ({ ...prev, [id]: { ...(prev[id] ?? {}), ...patch } }))
@@ -267,6 +270,43 @@ export default function Evaluations() {
     if (!err) ids.forEach(id => applyChange(id, { status: 'sent' }))
   }
 
+  const handleSendEmail = async (group) => {
+    const { key: evaluatorId, items: evals } = group
+    setEmailBusyIds(prev => new Set(prev).add(evaluatorId))
+    setEmailErrorIds(prev => { const s = new Set(prev); s.delete(evaluatorId); return s })
+
+    const byCycle = {}
+    evals.forEach(ev => {
+      const cid = ev.cycle_id
+      if (!byCycle[cid]) byCycle[cid] = []
+      byCycle[cid].push(ev)
+    })
+
+    let anyError = false
+    for (const [cycle_id, cycleEvals] of Object.entries(byCycle)) {
+      const { data, error } = await supabase.functions.invoke('send-evaluation-emails', {
+        body: { evaluator_id: evaluatorId, cycle_id },
+      })
+      if (error || data?.error) {
+        anyError = true
+        console.error('Erro ao enviar email:', error ?? data?.error)
+      } else {
+        cycleEvals.forEach(ev => {
+          if ((localChanges[ev.id]?.status ?? ev.status) === 'pending') applyChange(ev.id, { status: 'sent' })
+        })
+      }
+    }
+
+    setEmailBusyIds(prev => { const s = new Set(prev); s.delete(evaluatorId); return s })
+    if (anyError) {
+      setEmailErrorIds(prev => new Set(prev).add(evaluatorId))
+      setTimeout(() => setEmailErrorIds(prev => { const s = new Set(prev); s.delete(evaluatorId); return s }), 4000)
+    } else {
+      setEmailSentIds(prev => new Set(prev).add(evaluatorId))
+      setTimeout(() => setEmailSentIds(prev => { const s = new Set(prev); s.delete(evaluatorId); return s }), 3000)
+    }
+  }
+
   const setGroupByPersisted = (val) => { setGroupBy(val); localStorage.setItem('pf_eval_group_by', val) }
   const toggleHideSubmitted = () => {
     const next = !hideSubmitted; setHideSubmitted(next); localStorage.setItem('pf_hide_submitted', String(next))
@@ -352,8 +392,12 @@ export default function Evaluations() {
 
   const renderEvaluatorCard = (group) => {
     const { key: evaluatorId, evaluator, items } = group
-    const isBusy = bulkCopyBusy.has(evaluatorId)
-    const isCopied = copiedEvaluatorId === evaluatorId
+    const isCopyBusy   = bulkCopyBusy.has(evaluatorId)
+    const isCopied     = copiedEvaluatorId === evaluatorId
+    const isEmailBusy  = emailBusyIds.has(evaluatorId)
+    const isEmailSent  = emailSentIds.has(evaluatorId)
+    const isEmailError = emailErrorIds.has(evaluatorId)
+    const hasEmail     = !!evaluator?.email
     const ini = (evaluator?.full_name ?? '?').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
     return (
       <div key={evaluatorId} className="eva-card">
@@ -364,17 +408,28 @@ export default function Evaluations() {
             {evaluator?.employee_number && <div className="eva-num">#{evaluator.employee_number}</div>}
           </div>
           <span className="eva-badge">{items.length} avaliaç{items.length !== 1 ? 'ões' : 'ão'}</span>
-          <button
-            className={`eva-copy-btn${isCopied ? ' copied' : ''}`}
-            onClick={() => handleCopyEvaluatorEmail(group)}
-            disabled={isBusy}
-          >
-            {isBusy
-              ? <span style={{ fontSize: 11 }}>A gerar links…</span>
-              : isCopied
-                ? <><Copy size={11} /> Copiado!</>
-                : <><Copy size={11} /> Copiar Email</>}
-          </button>
+          <div className="eva-actions">
+            <button
+              className={`eva-email-btn${isEmailSent ? ' sent' : ''}${isEmailError ? ' error' : ''}`}
+              onClick={() => handleSendEmail(group)}
+              disabled={isEmailBusy || !hasEmail}
+              title={!hasEmail ? 'O avaliador não tem email registado' : undefined}
+            >
+              <Mail size={11} />
+              {isEmailBusy ? 'A enviar…' : isEmailSent ? 'Enviado!' : isEmailError ? 'Erro no envio' : 'Enviar Email'}
+            </button>
+            <button
+              className={`eva-copy-btn${isCopied ? ' copied' : ''}`}
+              onClick={() => handleCopyEvaluatorEmail(group)}
+              disabled={isCopyBusy}
+            >
+              {isCopyBusy
+                ? <span style={{ fontSize: 11 }}>A gerar links…</span>
+                : isCopied
+                  ? <><Copy size={11} /> Copiado!</>
+                  : <><Copy size={11} /> Copiar Email</>}
+            </button>
+          </div>
         </div>
         <div className="eva-evals">
           {items.map(ev => {
@@ -946,8 +1001,21 @@ export default function Evaluations() {
           white-space: nowrap;
         }
         [data-theme='dark'] .eva-badge { background: rgba(224,203,75,0.1); color: var(--color-accent); }
+        .eva-actions { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }
+        .eva-email-btn {
+          height: 30px; padding: 0 11px; border-radius: 7px;
+          font-size: 11px; font-weight: 700; font-family: 'Outfit', sans-serif;
+          border: none; background: var(--color-accent); color: var(--color-primary);
+          display: inline-flex; align-items: center; gap: 5px;
+          cursor: pointer; transition: opacity 0.12s;
+          white-space: nowrap; flex-shrink: 0;
+        }
+        .eva-email-btn:hover:not(:disabled) { opacity: 0.82; }
+        .eva-email-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .eva-email-btn.sent  { background: rgba(22,163,74,0.1);  border: 1px solid rgba(22,163,74,0.25);  color: #16a34a; }
+        .eva-email-btn.error { background: rgba(220,60,60,0.08); border: 1px solid rgba(220,60,60,0.18); color: #e05252; }
         .eva-copy-btn {
-          margin-left: auto; height: 30px; padding: 0 11px; border-radius: 7px;
+          height: 30px; padding: 0 11px; border-radius: 7px;
           font-size: 11px; font-weight: 600; font-family: 'Outfit', sans-serif;
           border: 1px solid var(--color-border); background: transparent;
           color: var(--color-text-muted);
