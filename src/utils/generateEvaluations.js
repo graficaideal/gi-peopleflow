@@ -28,13 +28,14 @@ export async function generateEvaluationsForCycle(cycleId) {
   })
 
   const records = []
+  const peerCounts = new Map()
 
   for (const emp of employees) {
     records.push(makeRecord(emp.id, emp.id, 'self'))
     if (emp.manager_id) {
       records.push(makeRecord(emp.id, emp.manager_id, 'manager'))
     }
-    for (const peer of selectPeerEvaluators(emp, employees, peerLimit)) {
+    for (const peer of selectPeerEvaluators(emp, employees, peerLimit, peerCounts)) {
       records.push(makeRecord(emp.id, peer.id, 'peer'))
     }
   }
