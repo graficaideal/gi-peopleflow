@@ -59,6 +59,12 @@ export const SCORE_LABELS = {
   5: 'Muito Bom',
 }
 
+export const EMPLOYEE_STATUS_LABELS = {
+  active: 'Ativo',
+  inactive: 'Inativo',
+  medical_leave: 'Baixa médica',
+}
+
 export const DEPARTMENT_AREAS = {
   ADMINISTRATIVA: 'administrativa',
   PRODUCAO: 'producao',

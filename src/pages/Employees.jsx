@@ -1,7 +1,9 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Plus, Users, Search, X } from 'lucide-react'
+import { Plus, Users, Search, X, Download } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabaseClient'
 import { useEmployees } from '../hooks/useEmployees'
+import { EMPLOYEE_STATUS_LABELS } from '../lib/constants'
 import EmployeeTable from '../components/employees/EmployeeTable'
 import EmployeeForm from '../components/employees/EmployeeForm'
 
@@ -102,6 +104,33 @@ export default function Employees() {
     return list
   }, [employees, search, statusFilter])
 
+  const handleExportExcel = () => {
+    const rows = [...filtered]
+      .sort((a, b) =>
+        (a.department?.name ?? '').localeCompare(b.department?.name ?? '') ||
+        (a.team?.name ?? '').localeCompare(b.team?.name ?? '') ||
+        (a.full_name ?? '').localeCompare(b.full_name ?? '')
+      )
+      .map(e => ({
+        'Nº Colaborador': e.employee_number ?? '',
+        'Nome Completo': e.full_name ?? '',
+        'Categoria Profissional': e.job_category?.name ?? '',
+        'Departamento': e.department?.name ?? '',
+        'Equipa': e.team?.name ?? '',
+        'Estado': EMPLOYEE_STATUS_LABELS[e.status] ?? e.status ?? '',
+      }))
+
+    const sheet = XLSX.utils.json_to_sheet(rows)
+    const book = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(book, sheet, 'Colaboradores')
+
+    const today = new Date()
+    const dd = String(today.getDate()).padStart(2, '0')
+    const mm = String(today.getMonth() + 1).padStart(2, '0')
+    const yyyy = today.getFullYear()
+    XLSX.writeFile(book, `colaboradores_${dd}-${mm}-${yyyy}.xlsx`)
+  }
+
   const handleDeleteConfirm = async () => {
     setDeleting(true)
     setDeleteError('')
@@ -127,14 +156,25 @@ export default function Employees() {
             </p>
           )}
         </div>
-        <button
-          className="ui-btn primary"
-          style={{ height: 36 }}
-          onClick={() => setEmpModal({ mode: 'create', emp: null })}
-        >
-          <Plus size={14} />
-          Novo Colaborador
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className="ui-btn secondary"
+            style={{ height: 36 }}
+            onClick={handleExportExcel}
+            disabled={loading || filtered.length === 0}
+          >
+            <Download size={14} />
+            Exportar Excel
+          </button>
+          <button
+            className="ui-btn primary"
+            style={{ height: 36 }}
+            onClick={() => setEmpModal({ mode: 'create', emp: null })}
+          >
+            <Plus size={14} />
+            Novo Colaborador
+          </button>
+        </div>
       </div>
 
       {/* Toolbar */}
