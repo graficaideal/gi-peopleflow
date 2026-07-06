@@ -137,7 +137,6 @@ export default function Cycles() {
           color: var(--color-text-muted);
         }
         .cy-meta-sep { opacity: 0.35; }
-        .cy-card-type { font-weight: 500; }
         .cy-card-dates, .cy-card-anon { display: inline-flex; align-items: center; }
 
         .cy-card-actions {

@@ -1,6 +1,7 @@
 import { Pencil, Trash2, Play, Lock, Calendar, Eye, EyeOff } from 'lucide-react'
 import CycleStatusBadge from './CycleStatusBadge'
-import { formatDate, formatCycleType } from '../../utils/formatters'
+import CycleTypeBadge from './CycleTypeBadge'
+import { formatDate } from '../../utils/formatters'
 
 export default function CycleCard({ cycle, onEdit, onDelete, onActivate, onCloseCycle }) {
   const isActive = cycle.status === 'active'
@@ -12,7 +13,7 @@ export default function CycleCard({ cycle, onEdit, onDelete, onActivate, onClose
         <div className="cy-card-left">
           <div className="cy-card-name">{cycle.name}</div>
           <div className="cy-card-meta">
-            <span className="cy-card-type">{formatCycleType(cycle.type)}</span>
+            <CycleTypeBadge type={cycle.type} />
             <span className="cy-meta-sep">·</span>
             <span className="cy-card-dates">
               <Calendar size={11} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }} />
