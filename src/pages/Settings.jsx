@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Settings2, ListChecks, ShieldAlert, User, Check, Trash2, X, AlertTriangle } from 'lucide-react'
+import { Settings2, ListChecks, ShieldAlert, User, Check } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
 import CriteriaSettings from '../components/settings/CriteriaSettings'
@@ -106,44 +106,7 @@ export default function Settings() {
     setCriteria(newOrder.map((c, i) => ({ ...c, sort_order: i + 1 })))
   }
 
-  // ── Reset flow ──
-  const [resetModal, setResetModal]       = useState('closed') // 'closed'|'password'|'confirm'|'done'
-  const [passwordInput, setPasswordInput] = useState('')
-  const [passwordError, setPasswordError] = useState('')
-  const [confirmCode, setConfirmCode]     = useState('')
-  const [confirmInput, setConfirmInput]   = useState('')
-  const [confirmError, setConfirmError]   = useState('')
-  const [resetting, setResetting]         = useState(false)
-
-  const openReset = () => {
-    setPasswordInput(''); setPasswordError(''); setResetModal('password')
-  }
-  const closeReset = () => {
-    setResetModal('closed')
-    setPasswordInput(''); setPasswordError('')
-    setConfirmInput('');  setConfirmError('')
-  }
-  const handlePasswordSubmit = () => {
-    if (passwordInput !== 'Rilop#100') { setPasswordError('Password incorrecta.'); return }
-    setConfirmCode(Math.floor(1000 + Math.random() * 9000).toString())
-    setConfirmInput(''); setConfirmError('')
-    setResetModal('confirm')
-  }
-  const handleReset = async () => {
-    if (confirmInput !== confirmCode) { setConfirmError('Código incorrecto. Tenta novamente.'); return }
-    setResetting(true); setConfirmError('')
-    try {
-      const { error: evErr } = await supabase.from('pf_evaluations').delete().not('id', 'is', null)
-      if (evErr) throw evErr
-      const { error: cyErr } = await supabase.from('pf_evaluation_cycles').update({ status: 'draft' }).not('id', 'is', null)
-      if (cyErr) throw cyErr
-      setResetModal('done')
-    } catch (err) {
-      setConfirmError(err.message)
-    } finally {
-      setResetting(false)
-    }
-  }
+  const [activeTab, setActiveTab] = useState('perfil')
 
   const handleSaveSettings = async (values) => {
     const rows = Object.entries(values).map(([key, value]) => ({
@@ -367,130 +330,33 @@ export default function Settings() {
           padding: 7px 11px;
         }
 
-        /* ── Danger zone ── */
-        .st-danger-card {
-          background: var(--color-surface);
-          border: 1px solid rgba(220,60,60,0.25);
-          border-radius: 13px;
-          overflow: hidden;
-        }
-        .st-danger-inner {
-          padding: 18px 20px;
+        /* ── Tabs ── */
+        .st-tabs {
           display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 20px;
-          flex-wrap: wrap;
+          gap: 4px;
+          padding: 4px;
+          background: var(--color-hover);
+          border-radius: 9px;
+          width: fit-content;
+          margin-bottom: 28px;
         }
-        .st-danger-btn {
-          height: 36px;
-          padding: 0 16px;
-          border-radius: 8px;
-          font-size: 13px;
-          font-weight: 600;
-          font-family: 'Outfit', sans-serif;
-          background: rgba(220,60,60,0.08);
-          color: #e05252;
-          border: 1px solid rgba(220,60,60,0.22);
-          cursor: pointer;
+        .st-tab {
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          flex-shrink: 0;
-          transition: background 0.15s, border-color 0.15s;
+          padding: 7px 15px;
+          border-radius: 6px;
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--color-text-muted);
+          transition: background 0.15s, color 0.15s;
           white-space: nowrap;
         }
-        .st-danger-btn:hover { background: rgba(220,60,60,0.14); border-color: rgba(220,60,60,0.4); }
-
-        /* ── Reset modals ── */
-        .st-overlay {
-          position: fixed; inset: 0;
-          background: rgba(0,0,0,0.45);
-          backdrop-filter: blur(4px);
-          display: flex; align-items: center; justify-content: center;
-          z-index: 1000; padding: 24px;
-        }
-        .st-modal {
+        .st-tab:hover { color: var(--color-text); }
+        .st-tab.active {
           background: var(--color-surface);
-          border: 1px solid var(--color-border);
-          border-radius: 16px;
-          width: 100%; max-width: 400px;
-          box-shadow: 0 24px 64px rgba(0,0,0,0.18);
-          animation: st-fadeUp 0.22s cubic-bezier(0.16,1,0.3,1) both;
-        }
-        .st-modal-header {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 20px 22px 0;
-        }
-        .st-modal-title { font-size: 15px; font-weight: 700; color: var(--color-text); letter-spacing: -0.2px; }
-        .st-modal-close {
-          width: 28px; height: 28px; border-radius: 7px;
-          display: flex; align-items: center; justify-content: center;
-          color: var(--color-text-muted); transition: background 0.12s;
-        }
-        .st-modal-close:hover { background: var(--color-hover); }
-        .st-modal-body { padding: 16px 22px; display: flex; flex-direction: column; gap: 14px; }
-        .st-modal-footer {
-          display: flex; justify-content: flex-end; gap: 8px;
-          padding: 14px 22px 20px;
-          border-top: 1px solid var(--color-border);
-        }
-        .st-modal-desc { font-size: 13px; color: var(--color-text-muted); line-height: 1.6; }
-        .st-modal-warn {
-          display: flex; align-items: flex-start; gap: 8px;
-          padding: 10px 13px; border-radius: 9px;
-          background: rgba(220,60,60,0.07); border: 1px solid rgba(220,60,60,0.18);
-          font-size: 12px; color: #e05252; line-height: 1.5;
-        }
-        .st-code-box {
-          display: flex; align-items: center; justify-content: center;
-          padding: 18px; border-radius: 10px;
-          background: var(--color-bg); border: 1px solid var(--color-border);
-        }
-        .st-code {
-          font-size: 36px; font-weight: 800; letter-spacing: 10px;
-          color: var(--color-text); font-variant-numeric: tabular-nums;
-          padding-left: 10px; /* offset letter-spacing on last char */
-        }
-        .st-modal-input {
-          height: 38px; padding: 0 12px;
-          border: 1px solid var(--color-border); border-radius: 9px;
-          background: var(--color-bg); color: var(--color-text);
-          font-size: 15px; font-family: 'Outfit', sans-serif;
-          font-weight: 600; letter-spacing: 4px; text-align: center;
-          outline: none; transition: border-color 0.15s, box-shadow 0.15s;
-          width: 100%;
-        }
-        .st-modal-input:focus {
-          border-color: var(--color-accent);
-          box-shadow: 0 0 0 3px rgba(224,203,75,0.1);
-        }
-        .st-modal-input.error { border-color: #e05252; }
-        .st-modal-input::placeholder { letter-spacing: 0; font-weight: 400; color: var(--color-text-muted); }
-        .st-modal-error { font-size: 12px; color: #e05252; }
-        .st-btn {
-          height: 34px; padding: 0 16px; border-radius: 8px;
-          font-size: 13px; font-weight: 600; font-family: 'Outfit', sans-serif;
-          cursor: pointer; border: none;
-          display: inline-flex; align-items: center; gap: 5px;
-          transition: opacity 0.15s;
-        }
-        .st-btn-secondary {
-          background: transparent; color: var(--color-text-muted);
-          border: 1px solid var(--color-border);
-        }
-        .st-btn-secondary:hover { background: var(--color-hover); color: var(--color-text); }
-        .st-btn-primary { background: var(--color-accent); color: var(--color-primary); }
-        .st-btn-primary:hover:not(:disabled) { opacity: 0.88; }
-        .st-btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
-        .st-btn-danger { background: rgba(220,60,60,0.1); color: #e05252; border: 1px solid rgba(220,60,60,0.2); }
-        .st-btn-danger:hover:not(:disabled) { background: rgba(220,60,60,0.18); }
-        .st-btn-danger:disabled { opacity: 0.45; cursor: not-allowed; }
-        .st-done-icon {
-          width: 56px; height: 56px; border-radius: 14px;
-          background: rgba(22,163,74,0.1); color: #16a34a;
-          display: flex; align-items: center; justify-content: center;
-          margin: 0 auto; font-size: 28px;
+          color: var(--color-text);
+          box-shadow: 0 1px 4px rgba(0,0,0,0.08);
         }
 
         /* ── Skeleton ── */
@@ -522,206 +388,99 @@ export default function Settings() {
 
         {loadError && <p className="st-error" style={{ marginBottom: 24 }}>{loadError}</p>}
 
-        {/* ── Perfil ── */}
-        <div className="st-section" style={{ animationDelay: '0s' }}>
-          <div className="st-section-header">
-            <div className="st-section-icon" style={{ background: 'rgba(34,197,94,0.08)', color: '#16a34a' }}>
-              <User size={16} />
-            </div>
-            <div>
-              <div className="st-section-title">O Meu Perfil</div>
-              <div className="st-section-desc">
-                Nome de apresentação usado na saudação do Dashboard.
-              </div>
-            </div>
-          </div>
-          <ProfileSection user={user} onSave={updateDisplayName} />
+        <div className="st-tabs">
+          <button
+            className={`st-tab${activeTab === 'perfil' ? ' active' : ''}`}
+            onClick={() => setActiveTab('perfil')}
+          >
+            <User size={14} /> Perfil
+          </button>
+          <button
+            className={`st-tab${activeTab === 'criterios' ? ' active' : ''}`}
+            onClick={() => setActiveTab('criterios')}
+          >
+            <ListChecks size={14} /> Critérios de Avaliação
+          </button>
+          <button
+            className={`st-tab${activeTab === 'geral' ? ' active' : ''}`}
+            onClick={() => setActiveTab('geral')}
+          >
+            <Settings2 size={14} /> Configurações Gerais
+          </button>
         </div>
 
-        {/* ── Critérios ── */}
-        <div className="st-section" style={{ animationDelay: '0s' }}>
-          <div className="st-section-header">
-            <div className="st-section-icon" style={{ background: 'rgba(45,100,200,0.08)', color: '#3b74d4' }}>
-              <ListChecks size={16} />
-            </div>
-            <div>
-              <div className="st-section-title">Critérios de Avaliação</div>
-              <div className="st-section-desc">
-                Edita os labels e reordena conforme necessário.
+        {activeTab === 'perfil' && (
+          <div className="st-section">
+            <div className="st-section-header">
+              <div className="st-section-icon" style={{ background: 'rgba(34,197,94,0.08)', color: '#16a34a' }}>
+                <User size={16} />
               </div>
-              <div className="st-brc-notice">
-                <ShieldAlert size={11} />
-                Requisito BRC — critérios não podem ser eliminados
-              </div>
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="st-skeleton" style={{ height: 8 * 50 }} />
-          ) : (
-            <CriteriaSettings
-              criteria={criteria}
-              onUpdateLabel={handleUpdateLabel}
-              onReorder={handleReorder}
-            />
-          )}
-        </div>
-
-        {/* ── Configurações gerais ── */}
-        <div className="st-section" style={{ animationDelay: '0.06s' }}>
-          <div className="st-section-header">
-            <div className="st-section-icon" style={{ background: 'rgba(100,60,200,0.08)', color: '#7c50d4' }}>
-              <Settings2 size={16} />
-            </div>
-            <div>
-              <div className="st-section-title">Configurações Gerais</div>
-              <div className="st-section-desc">
-                Parâmetros globais usados na geração automática de avaliações e na criação de ciclos.
-              </div>
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="st-skeleton" style={{ height: 220 }} />
-          ) : (
-            <GeneralSettings
-              settings={settings}
-              onSave={handleSaveSettings}
-            />
-          )}
-        </div>
-        {/* ── Zona de Risco ── */}
-        <div className="st-section" style={{ animationDelay: '0.12s' }}>
-          <div className="st-section-header">
-            <div className="st-section-icon" style={{ background: 'rgba(220,60,60,0.08)', color: '#e05252' }}>
-              <AlertTriangle size={16} />
-            </div>
-            <div>
-              <div className="st-section-title">Zona de Risco</div>
-              <div className="st-section-desc">
-                Operações destrutivas e irreversíveis. Utilize apenas em ambiente de testes.
-              </div>
-            </div>
-          </div>
-          <div className="st-danger-card">
-            <div className="st-danger-inner">
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 3 }}>
-                  Repor Base de Dados
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.5 }}>
-                  Elimina todas as avaliações e respostas. Coloca todos os ciclos em Rascunho.
+                <div className="st-section-title">O Meu Perfil</div>
+                <div className="st-section-desc">
+                  Nome de apresentação usado na saudação do Dashboard.
                 </div>
               </div>
-              <button className="st-danger-btn" onClick={openReset}>
-                <Trash2 size={13} />
-                Repor
-              </button>
             </div>
+            <ProfileSection user={user} onSave={updateDisplayName} />
           </div>
-        </div>
+        )}
+
+        {activeTab === 'criterios' && (
+          <div className="st-section">
+            <div className="st-section-header">
+              <div className="st-section-icon" style={{ background: 'rgba(45,100,200,0.08)', color: '#3b74d4' }}>
+                <ListChecks size={16} />
+              </div>
+              <div>
+                <div className="st-section-title">Critérios de Avaliação</div>
+                <div className="st-section-desc">
+                  Edita os labels e reordena conforme necessário.
+                </div>
+                <div className="st-brc-notice">
+                  <ShieldAlert size={11} />
+                  Requisito BRC — critérios não podem ser eliminados
+                </div>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="st-skeleton" style={{ height: 8 * 50 }} />
+            ) : (
+              <CriteriaSettings
+                criteria={criteria}
+                onUpdateLabel={handleUpdateLabel}
+                onReorder={handleReorder}
+              />
+            )}
+          </div>
+        )}
+
+        {activeTab === 'geral' && (
+          <div className="st-section">
+            <div className="st-section-header">
+              <div className="st-section-icon" style={{ background: 'rgba(100,60,200,0.08)', color: '#7c50d4' }}>
+                <Settings2 size={16} />
+              </div>
+              <div>
+                <div className="st-section-title">Configurações Gerais</div>
+                <div className="st-section-desc">
+                  Parâmetros globais usados na geração automática de avaliações e na criação de ciclos.
+                </div>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="st-skeleton" style={{ height: 220 }} />
+            ) : (
+              <GeneralSettings
+                settings={settings}
+                onSave={handleSaveSettings}
+              />
+            )}
+          </div>
+        )}
       </div>
-
-      {/* ── Modal: password ── */}
-      {resetModal === 'password' && (
-        <div className="st-overlay" onClick={e => e.target === e.currentTarget && closeReset()}>
-          <div className="st-modal">
-            <div className="st-modal-header">
-              <span className="st-modal-title">Acesso Restrito</span>
-              <button className="st-modal-close" onClick={closeReset}><X size={14} /></button>
-            </div>
-            <div className="st-modal-body">
-              <p className="st-modal-desc">Introduza a password para continuar com esta operação.</p>
-              <input
-                type="password"
-                className={`st-modal-input${passwordError ? ' error' : ''}`}
-                style={{ letterSpacing: 0, fontWeight: 400, textAlign: 'left' }}
-                value={passwordInput}
-                onChange={e => { setPasswordInput(e.target.value); setPasswordError('') }}
-                onKeyDown={e => e.key === 'Enter' && handlePasswordSubmit()}
-                placeholder="Password"
-                autoFocus
-              />
-              {passwordError && <p className="st-modal-error">{passwordError}</p>}
-            </div>
-            <div className="st-modal-footer">
-              <button className="st-btn st-btn-secondary" onClick={closeReset}>Cancelar</button>
-              <button className="st-btn st-btn-primary" onClick={handlePasswordSubmit} disabled={!passwordInput}>
-                Continuar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Modal: confirm with code ── */}
-      {resetModal === 'confirm' && (
-        <div className="st-overlay" onClick={e => e.target === e.currentTarget && closeReset()}>
-          <div className="st-modal">
-            <div className="st-modal-header">
-              <span className="st-modal-title">Confirmação Final</span>
-              <button className="st-modal-close" onClick={closeReset}><X size={14} /></button>
-            </div>
-            <div className="st-modal-body">
-              <div className="st-modal-warn">
-                <AlertTriangle size={13} style={{ flexShrink: 0, marginTop: 1 }} />
-                <span>
-                  Esta operação é <strong>irreversível</strong>. Todas as avaliações e respostas serão eliminadas.
-                  Os ciclos voltam ao estado Rascunho.
-                </span>
-              </div>
-              <p className="st-modal-desc">Para confirmar, introduza o código abaixo:</p>
-              <div className="st-code-box">
-                <span className="st-code">{confirmCode}</span>
-              </div>
-              <input
-                className={`st-modal-input${confirmError ? ' error' : ''}`}
-                value={confirmInput}
-                onChange={e => { setConfirmInput(e.target.value.replace(/\D/g, '').slice(0, 4)); setConfirmError('') }}
-                onKeyDown={e => e.key === 'Enter' && handleReset()}
-                placeholder="Código de 4 dígitos"
-                autoFocus
-                inputMode="numeric"
-                maxLength={4}
-              />
-              {confirmError && <p className="st-modal-error">{confirmError}</p>}
-            </div>
-            <div className="st-modal-footer">
-              <button className="st-btn st-btn-secondary" onClick={closeReset}>Cancelar</button>
-              <button
-                className="st-btn st-btn-danger"
-                onClick={handleReset}
-                disabled={confirmInput.length < 4 || resetting}
-              >
-                <Trash2 size={13} />
-                {resetting ? 'A repor…' : 'Repor Base de Dados'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Modal: done ── */}
-      {resetModal === 'done' && (
-        <div className="st-overlay" onClick={e => e.target === e.currentTarget && closeReset()}>
-          <div className="st-modal">
-            <div className="st-modal-header">
-              <span className="st-modal-title">Operação Concluída</span>
-              <button className="st-modal-close" onClick={closeReset}><X size={14} /></button>
-            </div>
-            <div className="st-modal-body" style={{ alignItems: 'center', textAlign: 'center', paddingTop: 8 }}>
-              <div className="st-done-icon">✓</div>
-              <p className="st-modal-desc" style={{ marginTop: 4 }}>
-                Todas as avaliações e respostas foram eliminadas.<br />
-                Os ciclos foram repostos a <strong>Rascunho</strong>.
-              </p>
-            </div>
-            <div className="st-modal-footer" style={{ justifyContent: 'center' }}>
-              <button className="st-btn st-btn-primary" onClick={closeReset}>Fechar</button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   )
 }
