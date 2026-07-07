@@ -30,14 +30,12 @@ export function selectPeerEvaluators(employee, allEmployees, limit = 2, peerCoun
     return pickLeastLoaded(sameDept, limit, peerCounts)
   }
 
-  // Tier 3 só para colaboradores de departamentos administrativos
-  if (employee.department?.area === 'administrativa') {
-    const seenIds = new Set(sameDept.map(e => e.id))
-    const adminExtra = base.filter(e =>
-      !seenIds.has(e.id) && e.department?.area === 'administrativa'
-    )
-    return pickLeastLoaded([...sameDept, ...adminExtra], limit, peerCounts)
+  // Tier 3: alarga à área do colaborador (administrativa ou produção), nunca a ambas
+  const sameArea = base.filter(e => e.department?.area === employee.department?.area)
+  if (sameArea.length >= limit) {
+    return pickLeastLoaded(sameArea, limit, peerCounts)
   }
 
-  return pickLeastLoaded(sameDept, limit, peerCounts)
+  // Pool insuficiente mesmo ao nível da área: sem avaliação peer para este colaborador
+  return []
 }
