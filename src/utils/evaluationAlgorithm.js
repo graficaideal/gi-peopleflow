@@ -17,7 +17,7 @@ function pickLeastLoaded(pool, limit, peerCounts) {
 
 export function selectPeerEvaluators(employee, allEmployees, limit = 2, peerCounts = new Map()) {
   const base = allEmployees.filter(e =>
-    e.id !== employee.id && e.id !== employee.manager_id
+    e.id !== employee.id && e.id !== employee.manager_id && e.manager_id !== employee.id
   )
 
   const sameTeam = base.filter(e => e.team_id === employee.team_id)
