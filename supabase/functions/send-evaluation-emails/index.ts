@@ -3,11 +3,14 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const EVAL_BASE_URL = 'https://gi-peopleflow.vercel.app/avaliar'
 
 const TYPE_LABELS: Record<string, string> = {
-  self:    'Autoavaliação',
-  peer:    'Avaliação de Colega',
-  manager: 'Avaliação de Chefia',
-  general: 'Avaliação Geral',
+  self:        'Autoavaliação',
+  peer:        'Avaliação por Colega',
+  manager:     'Avaliação por Chefia',
+  general:     'Avaliação Geral',
+  subordinate: 'Avaliação por Subordinado',
 }
+
+const TYPE_ORDER: Record<string, number> = { self: 0, peer: 1, manager: 2, general: 3, subordinate: 4 }
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -61,7 +64,9 @@ Deno.serve(async (req: Request) => {
     const n  = evals.length
     const pl = n !== 1
 
-    const evalRowsHtml = evals.map(ev => {
+    const sortedEvals = [...evals].sort((a, b) => (TYPE_ORDER[a.type] ?? 99) - (TYPE_ORDER[b.type] ?? 99))
+
+    const evalRowsHtml = sortedEvals.map(ev => {
       const evaluatee = Array.isArray(ev.evaluatee) ? ev.evaluatee[0] : ev.evaluatee
       const typeLabel = TYPE_LABELS[ev.type] ?? ev.type
       const link      = ev.token ? `${EVAL_BASE_URL}/${ev.token}` : null

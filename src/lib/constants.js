@@ -8,10 +8,10 @@ export const EVALUATION_TYPES = {
 
 export const EVALUATION_TYPE_LABELS = {
   self: 'Autoavaliação',
-  peer: 'Avaliação de Colega',
-  manager: 'Avaliação de Chefia',
+  peer: 'Avaliação por Colega',
+  manager: 'Avaliação por Chefia',
   general: 'Avaliação Geral',
-  subordinate: 'Avaliação de Subordinado',
+  subordinate: 'Avaliação por Subordinado',
 }
 
 export const CYCLE_TYPES = {

@@ -218,8 +218,10 @@ export default function Evaluations() {
       tokenMap[ev.id] = token
     }))
 
+    const sortedEvals = [...evals].sort((a, b) => (TYPE_ORDER[a.type] ?? 99) - (TYPE_ORDER[b.type] ?? 99))
+
     const byCycle = {}
-    evals.forEach(ev => {
+    sortedEvals.forEach(ev => {
       const cycle = getCycle(ev)
       const cid = cycle?.id ?? 'none'
       if (!byCycle[cid]) byCycle[cid] = { cycle, evals: [] }
@@ -389,6 +391,9 @@ export default function Evaluations() {
       const key = evaluator?.id ?? 'unknown'
       if (!map[key]) map[key] = { key, evaluator, items: [] }
       map[key].items.push(ev)
+    })
+    Object.values(map).forEach(group => {
+      group.items.sort((a, b) => (TYPE_ORDER[a.type] ?? 99) - (TYPE_ORDER[b.type] ?? 99))
     })
     return Object.values(map).sort((a, b) =>
       (a.evaluator?.full_name ?? '').localeCompare(b.evaluator?.full_name ?? '', 'pt')
