@@ -3,6 +3,7 @@ export const EVALUATION_TYPES = {
   PEER: 'peer',
   MANAGER: 'manager',
   GENERAL: 'general',
+  SUBORDINATE: 'subordinate',
 }
 
 export const EVALUATION_TYPE_LABELS = {
@@ -10,6 +11,7 @@ export const EVALUATION_TYPE_LABELS = {
   peer: 'Avaliação de Colega',
   manager: 'Avaliação de Chefia',
   general: 'Avaliação Geral',
+  subordinate: 'Avaliação de Subordinado',
 }
 
 export const CYCLE_TYPES = {

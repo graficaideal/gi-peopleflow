@@ -29,7 +29,7 @@ function buildHistory(evaluations) {
   return Object.values(byCycle).map(({ cycle, evals }) => {
     const avgByType = {}
     const allScores = []
-    for (const type of ['self', 'peer', 'manager', 'general']) {
+    for (const type of ['self', 'peer', 'manager', 'general', 'subordinate']) {
       const scores = evals
         .filter(e => e.type === type)
         .flatMap(e => (e.answers ?? []).map(a => a.score).filter(Boolean))
@@ -325,7 +325,7 @@ export default function EmployeeDetail() {
           }
           .eh-scores {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(6, 1fr);
             divide-x: 1px solid var(--color-border);
           }
           .eh-score-cell {
@@ -393,7 +393,7 @@ export default function EmployeeDetail() {
               )}
             </div>
             <div className="eh-scores">
-              {['self', 'peer', 'manager', 'general'].map(type => (
+              {['self', 'peer', 'manager', 'general', 'subordinate'].map(type => (
                 <div key={type} className="eh-score-cell">
                   <div className="eh-score-label">{EVALUATION_TYPE_LABELS[type]}</div>
                   {avgByType[type] ? (

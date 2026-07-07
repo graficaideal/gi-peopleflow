@@ -34,6 +34,7 @@ export async function generateEvaluationsForCycle(cycleId) {
     records.push(makeRecord(emp.id, emp.id, 'self'))
     if (emp.manager_id) {
       records.push(makeRecord(emp.id, emp.manager_id, 'manager'))
+      records.push(makeRecord(emp.manager_id, emp.id, 'subordinate'))
     }
     for (const peer of selectPeerEvaluators(emp, employees, peerLimit, peerCounts)) {
       records.push(makeRecord(emp.id, peer.id, 'peer'))

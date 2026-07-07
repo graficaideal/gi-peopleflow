@@ -1,9 +1,10 @@
 import { EVALUATION_TYPE_LABELS } from '../../lib/constants'
 
 const TYPE_CONFIG = {
-  self:    { bg: 'rgba(91,111,160,0.1)',  color: '#5b6fa0' },
-  peer:    { bg: 'rgba(34,197,94,0.1)',   color: '#16a34a' },
-  manager: { bg: 'rgba(194,87,10,0.1)',   color: '#c2570a' },
+  self:        { bg: 'rgba(91,111,160,0.1)',  color: '#5b6fa0' },
+  peer:        { bg: 'rgba(34,197,94,0.1)',   color: '#16a34a' },
+  manager:     { bg: 'rgba(194,87,10,0.1)',   color: '#c2570a' },
+  subordinate: { bg: 'rgba(13,148,136,0.1)',  color: '#0d9488' },
 }
 
 const STATUS_CONFIG = {

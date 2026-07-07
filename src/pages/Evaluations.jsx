@@ -17,20 +17,22 @@ const STATUS_CFG = {
 }
 
 const TYPE_CFG = {
-  self:    { color: '#6b7fc0', bg: 'rgba(107,127,192,0.1)', label: 'Auto' },
-  peer:    { color: '#16a34a', bg: 'rgba(34,197,94,0.1)',   label: 'Colega' },
-  manager: { color: '#c2570a', bg: 'rgba(194,87,10,0.1)',   label: 'Chefia' },
-  general: { color: '#9333ea', bg: 'rgba(147,51,234,0.1)',  label: 'Geral' },
+  self:        { color: '#6b7fc0', bg: 'rgba(107,127,192,0.1)', label: 'Auto' },
+  peer:        { color: '#16a34a', bg: 'rgba(34,197,94,0.1)',   label: 'Colega' },
+  manager:     { color: '#c2570a', bg: 'rgba(194,87,10,0.1)',   label: 'Chefia' },
+  general:     { color: '#9333ea', bg: 'rgba(147,51,234,0.1)',  label: 'Geral' },
+  subordinate: { color: '#0d9488', bg: 'rgba(13,148,136,0.1)',  label: 'Subordinado' },
 }
 
-const TYPE_ORDER = { self: 0, peer: 1, manager: 2, general: 3 }
+const TYPE_ORDER = { self: 0, peer: 1, manager: 2, general: 3, subordinate: 4 }
 
 const TYPE_FILTERS = [
-  { value: 'all',     label: 'Todos' },
-  { value: 'self',    label: 'Auto' },
-  { value: 'peer',    label: 'Colega' },
-  { value: 'manager', label: 'Chefia' },
-  { value: 'general', label: 'Geral' },
+  { value: 'all',         label: 'Todos' },
+  { value: 'self',        label: 'Auto' },
+  { value: 'peer',        label: 'Colega' },
+  { value: 'manager',     label: 'Chefia' },
+  { value: 'general',     label: 'Geral' },
+  { value: 'subordinate', label: 'Subordinado' },
 ]
 
 const STATUS_FILTERS = [
@@ -164,6 +166,9 @@ export default function Evaluations() {
     } else if (ev.type === 'general') {
       subject  = `Avaliação de Desempenho - Avaliação Geral`
       mainText = `Foi-te atribuída a avaliação geral de desempenho do/a ${evaluatee?.full_name ?? ''} referente ao ciclo ${cycleName}.\nPor favor acede ao link abaixo para preencher o questionário.`
+    } else if (ev.type === 'subordinate') {
+      subject  = `Avaliação de Desempenho - Avaliação de Chefia`
+      mainText = `Foi-te atribuída a avaliação de desempenho do/a ${evaluatee?.full_name ?? ''} (a tua chefia) referente ao ciclo ${cycleName}.\nPor favor acede ao link abaixo para preencher o questionário.`
     } else {
       subject  = `Avaliação de Desempenho - Avaliação da tua equipa`
       mainText = `Foi-te atribuída a avaliação de desempenho do/a ${evaluatee?.full_name ?? ''} referente ao ciclo ${cycleName}.\nPor favor acede ao link abaixo para preencher o questionário.`

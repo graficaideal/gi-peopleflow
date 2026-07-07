@@ -7,7 +7,7 @@ import EvaluationSummary from '../components/evaluations/EvaluationSummary'
 import { EvaluationTypeBadge, EvaluationStatusBadge } from '../components/evaluations/EvaluationBadge'
 import { formatDate } from '../utils/formatters'
 
-const TYPE_ICON = { self: User, peer: Users, manager: UserCheck }
+const TYPE_ICON = { self: User, peer: Users, manager: UserCheck, subordinate: UserCheck }
 
 const EVAL_BASE_URL = 'https://gi-peopleflow.vercel.app/avaliar'
 
