@@ -379,7 +379,7 @@ export default function Evaluations() {
     }
     return list.filter(e => {
       const s = localChanges[e.id]?.status ?? e.status
-      return s === 'pending' || s === 'sent'
+      return s === 'pending' || s === 'sent' || s === 'opened'
     })
   }, [evaluations, localChanges, groupBy, cycleFilter, typeFilter, search])
 
