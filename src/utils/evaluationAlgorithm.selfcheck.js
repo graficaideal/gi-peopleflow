@@ -1,4 +1,4 @@
-// ponytail: sanity check for the peer-evaluator hard cap and its two carve-outs,
+// ponytail: sanity check for the peer-evaluator hard cap and its carve-outs,
 // no framework needed. Run with: node src/utils/evaluationAlgorithm.selfcheck.js
 import assert from 'node:assert/strict'
 import { selectPeerEvaluators } from './evaluationAlgorithm.js'
@@ -53,4 +53,53 @@ const producao = { area: 'producao' }
   assert.equal(evaluators.length, 0, 'C: no peer evaluators, no fallback to department when team is all subordinates')
 }
 
-console.log('OK: peer evaluator hard cap, production carve-out and no-fallback rule all hold')
+// --- Test D: tier 2 fires once the (small) team pool is exhausted -----------------
+{
+  const e1 = { id: 'e1', manager_id: null, team_id: 'team-A', department_id: 'dept-1', department: admin }
+  const e2 = { id: 'e2', manager_id: null, team_id: 'team-A', department_id: 'dept-1', department: admin }
+  const e3 = { id: 'e3', manager_id: null, team_id: 'team-B', department_id: 'dept-1', department: admin }
+  const e4 = { id: 'e4', manager_id: null, team_id: 'team-B', department_id: 'dept-1', department: admin }
+  const employees = [e1, e2, e3, e4]
+
+  const evaluators = selectPeerEvaluators(e1, employees, 2, new Map())
+  assert.equal(evaluators.length, 2, 'D: widens to same department, other team once team-A (1 teammate) runs out')
+  assert.equal(evaluators[0].id, 'e2', 'D: tier 1 (same team) picked first')
+  assert.ok(['e3', 'e4'].includes(evaluators[1].id), 'D: tier 2 (same department, other team) picked second')
+}
+
+// --- Test E: tier 3 fires for related teams (production), never for unrelated ones -
+{
+  const p1 = { id: 'p1', manager_id: null, team_id: 'team-P1', department_id: 'dept-P', department: producao }
+  const p2 = { id: 'p2', manager_id: null, team_id: 'team-P1', department_id: 'dept-P', department: producao }
+  const p3 = { id: 'p3', manager_id: null, team_id: 'team-P2', department_id: 'dept-Q', department: producao }
+  const p4 = { id: 'p4', manager_id: null, team_id: 'team-P3', department_id: 'dept-R', department: producao }
+  const employees = [p1, p2, p3, p4]
+  const relationLookup = {
+    teams: new Map([['team-P1', new Set(['team-P3'])], ['team-P3', new Set(['team-P1'])]]),
+    departments: new Map(),
+  }
+
+  const evaluators = selectPeerEvaluators(p1, employees, 2, new Map(), relationLookup)
+  assert.equal(evaluators.length, 2, 'E: fills the limit via tier 3 once team and department tiers run out')
+  assert.equal(evaluators[0].id, 'p2', 'E: tier 1 (same team) picked first')
+  assert.equal(evaluators[1].id, 'p4', 'E: tier 3 picks the related team (p4), never the unrelated one (p3)')
+}
+
+// --- Test F: tier 3 fires for related departments (admin), and NULL team_id never --
+// --- pools across unrelated departments -------------------------------------------
+{
+  const a1 = { id: 'a1', manager_id: null, team_id: null, department_id: 'dept-X', department: admin }
+  const a2 = { id: 'a2', manager_id: null, team_id: null, department_id: 'dept-Y', department: admin }
+  const a3 = { id: 'a3', manager_id: null, team_id: null, department_id: 'dept-Z', department: admin }
+  const employees = [a1, a2, a3]
+  const relationLookup = {
+    teams: new Map(),
+    departments: new Map([['dept-X', new Set(['dept-Z'])], ['dept-Z', new Set(['dept-X'])]]),
+  }
+
+  const evaluators = selectPeerEvaluators(a1, employees, 2, new Map(), relationLookup)
+  assert.equal(evaluators.length, 1, 'F: only the related department (dept-Z) contributes an evaluator')
+  assert.equal(evaluators[0].id, 'a3', 'F: picks a3 (related dept-Z), never a2 (unrelated dept-Y)')
+}
+
+console.log('OK: peer evaluator hard cap, production carve-out, no-fallback rule, and relation-tier fallbacks all hold')
