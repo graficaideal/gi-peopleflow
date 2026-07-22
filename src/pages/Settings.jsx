@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Settings2, ListChecks, ShieldAlert, User, Check } from 'lucide-react'
+import { Settings2, ListChecks, ShieldAlert, User, Check, Network } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
+import { useDepartments } from '../hooks/useDepartments'
+import { DEPARTMENT_AREAS } from '../lib/constants'
 import CriteriaSettings from '../components/settings/CriteriaSettings'
 import GeneralSettings from '../components/settings/GeneralSettings'
+import RelationsPanel from '../components/settings/RelationsPanel'
 
 function ProfileSection({ user, onSave }) {
   const current = user?.user_metadata?.full_name ?? user?.email?.split('@')[0] ?? ''
@@ -65,26 +68,39 @@ function ProfileSection({ user, onSave }) {
 
 export default function Settings() {
   const { user, updateDisplayName } = useAuth()
-  const [criteria, setCriteria]   = useState([])
-  const [settings, setSettings]   = useState({})
-  const [loading, setLoading]     = useState(true)
-  const [loadError, setLoadError] = useState('')
+  const [criteria, setCriteria]     = useState([])
+  const [settings, setSettings]     = useState({})
+  const [departmentRelations, setDepartmentRelations] = useState([])
+  const [teamRelations, setTeamRelations] = useState([])
+  const [loading, setLoading]       = useState(true)
+  const [loadError, setLoadError]   = useState('')
+  const { departments } = useDepartments()
 
   const load = async () => {
     setLoading(true)
     setLoadError('')
-    const [criteriaRes, settingsRes] = await Promise.all([
+    const [criteriaRes, settingsRes, deptRelRes, teamRelRes] = await Promise.all([
       supabase.from('pf_criteria').select('*').order('sort_order'),
       supabase.from('pf_settings').select('*'),
+      supabase.from('pf_department_relations').select('id, department_a_id, department_b_id, department_a:pf_departments!department_a_id(name), department_b:pf_departments!department_b_id(name)'),
+      supabase.from('pf_team_relations').select('id, team_a_id, team_b_id, team_a:pf_teams!team_a_id(name), team_b:pf_teams!team_b_id(name)'),
     ])
-    if (criteriaRes.error || settingsRes.error) {
-      setLoadError(criteriaRes.error?.message ?? settingsRes.error?.message)
+    if (criteriaRes.error || settingsRes.error || deptRelRes.error || teamRelRes.error) {
+      setLoadError(criteriaRes.error?.message ?? settingsRes.error?.message ?? deptRelRes.error?.message ?? teamRelRes.error?.message)
       setLoading(false)
       return
     }
     setCriteria(criteriaRes.data ?? [])
     const map = Object.fromEntries((settingsRes.data ?? []).map(s => [s.key, s.value]))
     setSettings(map)
+    setDepartmentRelations((deptRelRes.data ?? []).map(r => ({
+      id: r.id, aId: r.department_a_id, aLabel: r.department_a?.name ?? '—',
+      bId: r.department_b_id, bLabel: r.department_b?.name ?? '—',
+    })))
+    setTeamRelations((teamRelRes.data ?? []).map(r => ({
+      id: r.id, aId: r.team_a_id, aLabel: r.team_a?.name ?? '—',
+      bId: r.team_b_id, bLabel: r.team_b?.name ?? '—',
+    })))
     setLoading(false)
   }
 
@@ -116,6 +132,40 @@ export default function Settings() {
     if (error) throw error
     setSettings(prev => ({ ...prev, ...values }))
   }
+
+  const handleAddDepartmentRelation = async (aId, bId) => {
+    const [a, b] = [aId, bId].sort()
+    const { error } = await supabase.from('pf_department_relations').insert({ department_a_id: a, department_b_id: b })
+    if (error) throw error
+    await load()
+  }
+
+  const handleRemoveDepartmentRelation = async (id) => {
+    const { error } = await supabase.from('pf_department_relations').delete().eq('id', id)
+    if (error) throw error
+    await load()
+  }
+
+  const handleAddTeamRelation = async (aId, bId) => {
+    const [a, b] = [aId, bId].sort()
+    const { error } = await supabase.from('pf_team_relations').insert({ team_a_id: a, team_b_id: b })
+    if (error) throw error
+    await load()
+  }
+
+  const handleRemoveTeamRelation = async (id) => {
+    const { error } = await supabase.from('pf_team_relations').delete().eq('id', id)
+    if (error) throw error
+    await load()
+  }
+
+  const departmentNodes = departments
+    .filter(d => d.area === DEPARTMENT_AREAS.ADMINISTRATIVA)
+    .map(d => ({ id: d.id, label: d.name }))
+
+  const teamNodes = departments
+    .filter(d => d.area === DEPARTMENT_AREAS.PRODUCAO)
+    .flatMap(d => d.teams.map(t => ({ id: t.id, label: t.name, groupLabel: d.name })))
 
   return (
     <>
@@ -359,6 +409,24 @@ export default function Settings() {
           box-shadow: 0 1px 4px rgba(0,0,0,0.08);
         }
 
+        /* ── Relations ── */
+        .st-relation-add {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 14px 16px;
+          border-top: 1px solid var(--color-border);
+          flex-wrap: wrap;
+        }
+        .st-relation-add select.st-input {
+          flex: 1;
+          min-width: 160px;
+        }
+        .st-relation-icon {
+          color: var(--color-text-muted);
+          flex-shrink: 0;
+        }
+
         /* ── Skeleton ── */
         .st-skeleton {
           background: var(--color-surface);
@@ -406,6 +474,12 @@ export default function Settings() {
             onClick={() => setActiveTab('geral')}
           >
             <Settings2 size={14} /> Configurações Gerais
+          </button>
+          <button
+            className={`st-tab${activeTab === 'relacionamentos' ? ' active' : ''}`}
+            onClick={() => setActiveTab('relacionamentos')}
+          >
+            <Network size={14} /> Relacionamentos
           </button>
         </div>
 
@@ -477,6 +551,45 @@ export default function Settings() {
                 settings={settings}
                 onSave={handleSaveSettings}
               />
+            )}
+          </div>
+        )}
+
+        {activeTab === 'relacionamentos' && (
+          <div className="st-section">
+            <div className="st-section-header">
+              <div className="st-section-icon" style={{ background: 'rgba(20,160,160,0.08)', color: '#0f9b9b' }}>
+                <Network size={16} />
+              </div>
+              <div>
+                <div className="st-section-title">Relacionamentos</div>
+                <div className="st-section-desc">
+                  Departamentos e equipas relacionados alargam o pool de avaliadores pares quando a própria equipa/departamento não tem colegas suficientes.
+                </div>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="st-skeleton" style={{ height: 220 }} />
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                <RelationsPanel
+                  title="Relacionamentos entre Departamentos"
+                  description="Usado para a área administrativa (departamentos sem equipas)."
+                  nodes={departmentNodes}
+                  relations={departmentRelations}
+                  onAdd={handleAddDepartmentRelation}
+                  onRemove={handleRemoveDepartmentRelation}
+                />
+                <RelationsPanel
+                  title="Relacionamentos entre Equipas"
+                  description="Usado para a área de produção (equipas dentro de departamentos)."
+                  nodes={teamNodes}
+                  relations={teamRelations}
+                  onAdd={handleAddTeamRelation}
+                  onRemove={handleRemoveTeamRelation}
+                />
+              </div>
             )}
           </div>
         )}
