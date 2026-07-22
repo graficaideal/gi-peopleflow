@@ -136,7 +136,10 @@ export default function Settings() {
   const handleAddDepartmentRelation = async (aId, bId) => {
     const [a, b] = [aId, bId].sort()
     const { error } = await supabase.from('pf_department_relations').insert({ department_a_id: a, department_b_id: b })
-    if (error) throw error
+    if (error) {
+      if (error.code === '23505') throw new Error('Este relacionamento já existe.')
+      throw error
+    }
     await load()
   }
 
@@ -149,7 +152,10 @@ export default function Settings() {
   const handleAddTeamRelation = async (aId, bId) => {
     const [a, b] = [aId, bId].sort()
     const { error } = await supabase.from('pf_team_relations').insert({ team_a_id: a, team_b_id: b })
-    if (error) throw error
+    if (error) {
+      if (error.code === '23505') throw new Error('Este relacionamento já existe.')
+      throw error
+    }
     await load()
   }
 
