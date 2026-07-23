@@ -147,7 +147,6 @@ export default function Evaluations() {
     let token = effToken(ev)
     if (!token) { token = await generateToken(ev, false); if (!token) return }
     const evaluatee = getEvaluatee(ev)
-    const evaluator = getEvaluator(ev)
     const cycle     = getCycle(ev)
     const recipient = getRecipient(ev)
     const link      = `${EVAL_BASE_URL}/${token}`
