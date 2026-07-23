@@ -20,7 +20,7 @@ const groupLabel = (emp) => emp.team?.name ?? emp.department?.name ?? '—'
 export default function CycleSimulation() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { cycles, loading: cyclesLoading, updateCycle } = useCycles()
+  const { cycles, loading: cyclesLoading, error: cyclesError, updateCycle } = useCycles()
   const cycle = cycles.find(c => c.id === id)
 
   const [plan, setPlan] = useState(null)
@@ -256,6 +256,10 @@ export default function CycleSimulation() {
 
         {initialLoading ? (
           <div className="sim-skeleton" />
+        ) : cyclesError ? (
+          <div className="sim-empty">
+            <p className="sim-error">{cyclesError}</p>
+          </div>
         ) : notFound ? (
           <div className="sim-empty">
             <p>Ciclo não encontrado.</p>
