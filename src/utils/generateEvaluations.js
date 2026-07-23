@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient'
-import { selectPeerEvaluators } from './evaluationAlgorithm'
+import { buildEvaluationPlan } from './simulateEvaluations'
 import { buildRelationLookup } from './relationLookup'
 
 export { buildRelationLookup }
@@ -23,7 +23,10 @@ export async function generateEvaluationsForCycle(cycleId) {
   const tokenExpiresAt = endDate ? new Date(endDate + 'T23:59:59').toISOString() : null
   const relationLookup = buildRelationLookup(teamRelResult.data, deptRelResult.data)
 
-  const makeRecord = (evaluateeId, evaluatorId, type) => ({
+  const { assignments } = buildEvaluationPlan({ employees, peerLimit, relationLookup, evaluator0072 })
+  if (!assignments.length) return
+
+  const records = assignments.map(({ evaluateeId, evaluatorId, type }) => ({
     cycle_id: cycleId,
     evaluatee_id: evaluateeId,
     evaluator_id: evaluatorId,
@@ -31,32 +34,7 @@ export async function generateEvaluationsForCycle(cycleId) {
     status: 'pending',
     token: crypto.randomUUID(),
     token_expires_at: tokenExpiresAt,
-  })
-
-  const records = []
-  const peerCounts = new Map()
-
-  for (const emp of employees) {
-    records.push(makeRecord(emp.id, emp.id, 'self'))
-    if (emp.manager_id) {
-      records.push(makeRecord(emp.id, emp.manager_id, 'manager'))
-      records.push(makeRecord(emp.manager_id, emp.id, 'subordinate'))
-    }
-    for (const peer of selectPeerEvaluators(emp, employees, peerLimit, peerCounts, relationLookup)) {
-      records.push(makeRecord(emp.id, peer.id, 'peer'))
-    }
-  }
-
-  if (evaluator0072) {
-    for (const emp of employees) {
-      if (emp.department?.area !== 'producao') continue
-      if (emp.employee_number === '0072') continue
-      if (emp.manager_id === evaluator0072.id) continue
-      records.push(makeRecord(emp.id, evaluator0072.id, 'general'))
-    }
-  }
-
-  if (!records.length) return
+  }))
 
   const { error } = await supabase
     .from('pf_evaluations')
