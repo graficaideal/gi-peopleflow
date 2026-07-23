@@ -4,6 +4,20 @@ function shuffle(arr) {
 
 const EMPTY_LOOKUP = { teams: new Map(), departments: new Map() }
 
+// Pool bruto de colegas de equipa elegíveis (exclui próprio, manager, subordinados
+// diretos). Extraído para ser reutilizável fora da seleção de avaliadores — por
+// exemplo para classificar o motivo de "sem par" numa simulação de ciclo.
+export function getTeamPool(employee, allEmployees) {
+  const eligible = allEmployees.filter(e =>
+    e.id !== employee.id &&
+    e.id !== employee.manager_id &&
+    e.manager_id !== employee.id
+  )
+  const hasTeam = employee.team_id != null
+  const teamPool = hasTeam ? eligible.filter(e => e.team_id === employee.team_id) : []
+  return { eligible, hasTeam, teamPool }
+}
+
 // Escolhe um avaliador ainda disponível (0 avaliações peer atribuídas), alargando
 // equipa → departamento (outra equipa) → relacionamentos (equipas ou departamentos)
 // conforme necessário, com desempate aleatório.
@@ -45,14 +59,7 @@ function pickOneEvaluator(employee, available, teamPool, isProducao, peerCounts,
 // fica com menos avaliadores que `limit` em vez de reutilizar alguém já carregado
 // (exceto na equipa de produção — ver `pickOneEvaluator`).
 export function selectPeerEvaluators(employee, allEmployees, limit = 2, peerCounts = new Map(), relationLookup = EMPTY_LOOKUP) {
-  const eligible = allEmployees.filter(e =>
-    e.id !== employee.id &&
-    e.id !== employee.manager_id &&
-    e.manager_id !== employee.id
-  )
-
-  const hasTeam = employee.team_id != null
-  const teamPool = hasTeam ? eligible.filter(e => e.team_id === employee.team_id) : []
+  const { eligible, hasTeam, teamPool } = getTeamPool(employee, allEmployees)
 
   // Responsável de turno/equipa cujos colegas são todos subordinados diretos: sem
   // colegas de equipa elegíveis, sem avaliação peer, sem fallback para departamento

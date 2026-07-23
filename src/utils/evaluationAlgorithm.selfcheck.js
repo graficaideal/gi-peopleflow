@@ -1,7 +1,7 @@
 // ponytail: sanity check for the peer-evaluator hard cap and its carve-outs,
 // no framework needed. Run with: node src/utils/evaluationAlgorithm.selfcheck.js
 import assert from 'node:assert/strict'
-import { selectPeerEvaluators } from './evaluationAlgorithm.js'
+import { selectPeerEvaluators, getTeamPool } from './evaluationAlgorithm.js'
 
 const admin = { area: 'administrativa' }
 const producao = { area: 'producao' }
@@ -102,4 +102,26 @@ const producao = { area: 'producao' }
   assert.equal(evaluators[0].id, 'a3', 'F: picks a3 (related dept-Z), never a2 (unrelated dept-Y)')
 }
 
-console.log('OK: peer evaluator hard cap, production carve-out, no-fallback rule, and relation-tier fallbacks all hold')
+// --- Test G: getTeamPool exposes eligible/hasTeam/teamPool for reason classification ---
+{
+  const lead = { id: 'lead', manager_id: null, team_id: 'lead-team', department_id: 'dept-1', department: admin }
+  const sub1 = { id: 'sub1', manager_id: 'lead', team_id: 'lead-team', department_id: 'dept-1', department: admin }
+  const solo = { id: 'solo', manager_id: null, team_id: 'solo-team', department_id: 'dept-1', department: admin }
+  const employees = [lead, sub1, solo]
+
+  const leadPool = getTeamPool(lead, employees)
+  assert.equal(leadPool.hasTeam, true, 'G: lead has a team_id')
+  assert.equal(leadPool.teamPool.length, 0, "G: lead's only teammate is a direct report, excluded from teamPool")
+  assert.ok(leadPool.eligible.some(e => e.id === 'solo'), 'G: eligible still includes employees outside the team')
+
+  const soloPool = getTeamPool(solo, employees)
+  assert.equal(soloPool.hasTeam, true, 'G: solo has its own team_id')
+  assert.equal(soloPool.teamPool.length, 0, 'G: solo has no teammates at all in its team')
+
+  const noTeam = { id: 'nt', manager_id: null, team_id: null, department_id: 'dept-1', department: admin }
+  const ntPool = getTeamPool(noTeam, employees)
+  assert.equal(ntPool.hasTeam, false, 'G: null team_id means hasTeam is false')
+  assert.equal(ntPool.teamPool.length, 0, 'G: hasTeam false always yields an empty teamPool')
+}
+
+console.log('OK: peer evaluator hard cap, production carve-out, no-fallback rule, relation-tier fallbacks, and getTeamPool extraction all hold')
