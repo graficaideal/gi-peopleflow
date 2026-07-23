@@ -1,4 +1,5 @@
-import { Pencil, Trash2, Play, Lock, Calendar, Eye, EyeOff } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Pencil, Trash2, Play, Lock, Calendar, Eye, EyeOff, FlaskConical } from 'lucide-react'
 import CycleStatusBadge from './CycleStatusBadge'
 import CycleTypeBadge from './CycleTypeBadge'
 import { formatDate } from '../../utils/formatters'
@@ -33,6 +34,11 @@ export default function CycleCard({ cycle, onEdit, onDelete, onActivate, onClose
         <div className="cy-card-right">
           <CycleStatusBadge status={cycle.status} />
           <div className="cy-card-actions">
+            {isDraft && (
+              <Link className="cy-action-btn" to={`/cycles/${cycle.id}/simulate`} title="Simular ciclo">
+                <FlaskConical size={13} />
+              </Link>
+            )}
             {isDraft && (
               <button className="cy-action-btn cy-action-activate" onClick={() => onActivate(cycle)} title="Ativar ciclo">
                 <Play size={13} />

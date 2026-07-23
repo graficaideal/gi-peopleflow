@@ -10,6 +10,7 @@ import EmployeeDetail from './pages/EmployeeDetail'
 import Evaluations from './pages/Evaluations'
 import EvaluationDetail from './pages/EvaluationDetail'
 import Cycles from './pages/Cycles'
+import CycleSimulation from './pages/CycleSimulation'
 import Departments from './pages/Departments'
 import Settings from './pages/Settings'
 import NotFound from './pages/NotFound'
@@ -41,6 +42,7 @@ export default function App() {
               <Route path="evaluations" element={<Evaluations />} />
               <Route path="evaluations/:id" element={<EvaluationDetail />} />
               <Route path="cycles" element={<Cycles />} />
+              <Route path="cycles/:id/simulate" element={<CycleSimulation />} />
               <Route path="departments" element={<Departments />} />
               <Route path="settings" element={<Settings />} />
             </Route>
