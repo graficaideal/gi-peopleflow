@@ -273,6 +273,7 @@ export default function Evaluations() {
       .from('pf_evaluations')
       .update({ status: 'sent' })
       .in('id', ids)
+      .eq('status', 'pending')
     if (!err) ids.forEach(id => applyChange(id, { status: 'sent' }))
   }
 
@@ -407,6 +408,7 @@ export default function Evaluations() {
     const isEmailSent  = emailSentIds.has(evaluatorId)
     const isEmailError = emailErrorIds.has(evaluatorId)
     const hasEmail     = !!evaluator?.email
+    const canSendEmail = items.some(ev => ['pending', 'sent', 'opened'].includes(localChanges[ev.id]?.status ?? ev.status))
     const ini = (evaluator?.full_name ?? '?').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
     return (
       <div key={evaluatorId} className="eva-card">
@@ -428,8 +430,8 @@ export default function Evaluations() {
             <button
               className={`eva-email-btn${isEmailSent ? ' sent' : ''}${isEmailError ? ' error' : ''}`}
               onClick={() => handleSendEmail(group)}
-              disabled={isEmailBusy || !hasEmail}
-              title={!hasEmail ? 'Sem email definido na ficha do colaborador' : undefined}
+              disabled={isEmailBusy || !hasEmail || !canSendEmail}
+              title={!hasEmail ? 'Sem email definido na ficha do colaborador' : !canSendEmail ? 'Todas as avaliações estão submetidas ou canceladas' : undefined}
             >
               <Mail size={11} />
               {isEmailBusy ? 'A enviar…' : isEmailSent ? 'Enviado!' : isEmailError ? 'Erro no envio' : 'Enviar Email'}
