@@ -45,7 +45,7 @@ Deno.serve(async (req: Request) => {
       `)
       .eq('evaluator_id', evaluator_id)
       .eq('cycle_id', cycle_id)
-      .in('status', ['pending', 'sent'])
+      .in('status', ['pending', 'sent', 'opened'])
 
     if (fetchErr) throw new Error(fetchErr.message)
     if (!evals?.length) return json({ error: 'Sem avaliações pendentes' }, 404)
