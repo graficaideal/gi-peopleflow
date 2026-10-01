@@ -17,6 +17,7 @@ export default function EvaluationPublic() {
   const [evaluation, setEvaluation] = useState(null)
   const [criteria, setCriteria]     = useState([])
   const [scores, setScores]         = useState({})
+  const [criteriaNotes, setCriteriaNotes] = useState({})
   const [notes, setNotes]           = useState('')
   const [saving, setSaving]         = useState(false)
   const [submitError, setSubmitError] = useState('')
@@ -41,7 +42,7 @@ export default function EvaluationPublic() {
         id, type, status, token, token_expires_at, notes,
         cycle:pf_evaluation_cycles(id, name, end_date),
         evaluatee:pf_employees!evaluatee_id(id, full_name, role),
-        answers:pf_evaluation_answers(id, criteria_id, score)
+        answers:pf_evaluation_answers(id, criteria_id, score, notes)
       `)
       .eq('token', token)
       .single()
@@ -72,6 +73,7 @@ export default function EvaluationPublic() {
       return { id: r.criteria_id, label: c?.label ?? '' }
     }))
     setScores(Object.fromEntries((ev.answers ?? []).map(a => [a.criteria_id, a.score])))
+    setCriteriaNotes(Object.fromEntries((ev.answers ?? []).filter(a => a.notes).map(a => [a.criteria_id, a.notes])))
     setNotes(ev.notes ?? '')
     setPageState('form')
   }, [token])
@@ -91,6 +93,7 @@ export default function EvaluationPublic() {
     const answers = Object.entries(scores).map(([criteria_id, score]) => ({
       criteria_id,
       score: Number(score),
+      notes: criteriaNotes[criteria_id]?.trim() || null,
     }))
 
     const { error } = await supabase.rpc('submit_evaluation', {
@@ -195,6 +198,7 @@ export default function EvaluationPublic() {
         /* ── Criteria rows — desktop ── */
         .pub-cr-row {
           display: flex;
+          flex-wrap: wrap;
           align-items: center;
           justify-content: space-between;
           gap: 16px;
@@ -522,6 +526,15 @@ export default function EvaluationPublic() {
                           </button>
                         ))}
                       </div>
+                      <textarea
+                        className="pub-textarea"
+                        style={{ flex: '1 1 100%', fontSize: 13, padding: '8px 11px' }}
+                        value={criteriaNotes[c.id] ?? ''}
+                        onChange={e => setCriteriaNotes(n => ({ ...n, [c.id]: e.target.value }))}
+                        placeholder="Observação (opcional)"
+                        rows={1}
+                        autoComplete="off"
+                      />
                     </div>
                   ))}
                 </div>

@@ -16,14 +16,22 @@ export default function CycleNotesModal({ cycle, onClose }) {
       .from('pf_evaluations')
       .select(`
         id, type, notes${evaluatorCol},
+        answers:pf_evaluation_answers(notes, criteria:pf_criteria(label, sort_order)),
         evaluatee:pf_employees!evaluatee_id(id, full_name, department:pf_departments(id, name))
       `)
       .eq('cycle_id', cycle.id)
       .eq('status', 'submitted')
-      .not('notes', 'is', null)
       .then(({ data, error }) => {
         if (error) { setError(error.message); setRows([]); return }
-        setRows((data ?? []).filter(e => e.notes?.trim()))
+        const withNotes = (data ?? []).map(e => ({
+          ...e,
+          notes: e.notes?.trim() || null,
+          criteriaNotes: (e.answers ?? [])
+            .map(a => ({ note: a.notes?.trim(), criteria: Array.isArray(a.criteria) ? a.criteria[0] : a.criteria }))
+            .filter(a => a.note)
+            .sort((a, b) => (a.criteria?.sort_order ?? 0) - (b.criteria?.sort_order ?? 0)),
+        }))
+        setRows(withNotes.filter(e => e.notes || e.criteriaNotes.length))
       })
   }, [cycle.id, cycle.anonymous])
 
@@ -85,7 +93,15 @@ export default function CycleNotesModal({ cycle, onClose }) {
                         {' · '}
                         {cycle.anonymous ? 'Anónimo' : n.evaluator?.full_name ?? '—'}
                       </div>
-                      <div style={{ fontSize: 13, color: 'var(--color-text)', whiteSpace: 'pre-wrap' }}>{n.notes.trim()}</div>
+                      {n.notes && (
+                        <div style={{ fontSize: 13, color: 'var(--color-text)', whiteSpace: 'pre-wrap' }}>{n.notes}</div>
+                      )}
+                      {n.criteriaNotes.map((cn, i) => (
+                        <div key={i} style={{ fontSize: 13, color: 'var(--color-text)', whiteSpace: 'pre-wrap', marginTop: 4 }}>
+                          <span style={{ fontWeight: 600, color: 'var(--color-text-muted)' }}>{cn.criteria?.label ?? '—'}: </span>
+                          {cn.note}
+                        </div>
+                      ))}
                     </div>
                   ))}
                 </div>

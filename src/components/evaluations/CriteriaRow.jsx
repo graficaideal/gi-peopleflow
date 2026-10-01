@@ -1,9 +1,9 @@
 import { SCORE_LABELS } from '../../lib/constants'
 import ScoreDisplay from './ScoreDisplay'
 
-export default function CriteriaRow({ criterion, score, onChange, readonly = false }) {
+export default function CriteriaRow({ criterion, score, onChange, readonly = false, note }) {
   return (
-    <div className="cr-row">
+    <div className="cr-row" style={note ? { flexWrap: 'wrap' } : undefined}>
       <div className="cr-label">{criterion.label}</div>
       {readonly ? (
         <div style={{ flexShrink: 0, minWidth: 100, textAlign: 'right' }}>
@@ -23,6 +23,11 @@ export default function CriteriaRow({ criterion, score, onChange, readonly = fal
               <span className="cr-lbl">{SCORE_LABELS[n]}</span>
             </button>
           ))}
+        </div>
+      )}
+      {note && (
+        <div style={{ flexBasis: '100%', fontSize: 12, color: 'var(--color-text-muted)', whiteSpace: 'pre-wrap', paddingBottom: 10 }}>
+          {note}
         </div>
       )}
     </div>

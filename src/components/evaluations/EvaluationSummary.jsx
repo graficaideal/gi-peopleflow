@@ -10,6 +10,7 @@ function avgColor(v) {
 
 export default function EvaluationSummary({ evaluation, criteria }) {
   const scoreMap = Object.fromEntries((evaluation.answers ?? []).map(a => [a.criteria_id, a.score]))
+  const noteMap = Object.fromEntries((evaluation.answers ?? []).map(a => [a.criteria_id, a.notes]))
   const scores = criteria.map(c => scoreMap[c.id]).filter(Boolean)
   const avg = scores.length
     ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
@@ -23,6 +24,7 @@ export default function EvaluationSummary({ evaluation, criteria }) {
             key={c.id}
             criterion={c}
             score={scoreMap[c.id]}
+            note={noteMap[c.id]}
             readonly
           />
         ))}

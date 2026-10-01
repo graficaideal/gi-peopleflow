@@ -31,7 +31,7 @@ export default function EvaluationDetail() {
         cycle:pf_evaluation_cycles(id, name, anonymous, status, end_date),
         evaluatee:pf_employees!evaluatee_id(id, full_name, employee_number, role, email),
         evaluator:pf_employees!evaluator_id(id, full_name, employee_number, email),
-        answers:pf_evaluation_answers(id, criteria_id, score)
+        answers:pf_evaluation_answers(id, criteria_id, score, notes)
       `).eq('id', id).single(),
       supabase.from('pf_criteria').select('*').eq('active', true).order('sort_order'),
     ])
