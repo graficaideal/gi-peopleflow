@@ -30,6 +30,7 @@ export default function EvaluationPublic() {
       const msg = rpcErr.message ?? ''
       if (msg.includes('expired'))           { setPageState('expired'); return }
       if (msg.includes('already_submitted')) { setPageState('already_submitted'); return }
+      if (msg.includes('cancelled'))         { setPageState('cancelled'); return }
       setPageState('invalid'); return
     }
 
@@ -415,6 +416,14 @@ export default function EvaluationPublic() {
                 O prazo para preencher esta avaliação terminou.
                 {cycle?.end_date && <> Prazo era {formatDate(cycle.end_date)}.</>}
               </div>
+            </div>
+          )}
+
+          {pageState === 'cancelled' && (
+            <div className="pub-card pub-state-box">
+              <div className="pub-state-icon" style={{ background: 'rgba(220,60,60,0.12)' }}>✕</div>
+              <div className="pub-state-title">Avaliação cancelada</div>
+              <div className="pub-state-msg">Esta avaliação foi cancelada.</div>
             </div>
           )}
 

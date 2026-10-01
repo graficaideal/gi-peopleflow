@@ -51,6 +51,7 @@ export const EVALUATION_STATUS_LABELS = {
   sent: 'Enviada',
   opened: 'Aberta',
   submitted: 'Submetida',
+  cancelled: 'Cancelada',
 }
 
 export const SCORE_LABELS = {
