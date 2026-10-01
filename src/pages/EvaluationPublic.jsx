@@ -35,19 +35,16 @@ export default function EvaluationPublic() {
     }
 
     // Step 2: fetch full evaluation data for the form
-    const [evalRes, criteriaRes] = await Promise.all([
-      supabase
-        .from('pf_evaluations')
-        .select(`
-          id, type, status, token, token_expires_at, notes,
-          cycle:pf_evaluation_cycles(id, name, end_date),
-          evaluatee:pf_employees!evaluatee_id(id, full_name, role),
-          answers:pf_evaluation_answers(id, criteria_id, score)
-        `)
-        .eq('token', token)
-        .single(),
-      supabase.from('pf_criteria').select('*').eq('active', true).order('sort_order'),
-    ])
+    const evalRes = await supabase
+      .from('pf_evaluations')
+      .select(`
+        id, type, status, token, token_expires_at, notes,
+        cycle:pf_evaluation_cycles(id, name, end_date),
+        evaluatee:pf_employees!evaluatee_id(id, full_name, role),
+        answers:pf_evaluation_answers(id, criteria_id, score)
+      `)
+      .eq('token', token)
+      .single()
 
     if (evalRes.error || !evalRes.data) {
       console.error('[EvaluationPublic] SELECT error:', evalRes.error)
@@ -55,8 +52,25 @@ export default function EvaluationPublic() {
     }
 
     const ev = evalRes.data
+
+    // Criteria depend on the evaluation type, so this can't run in parallel with the fetch above
+    const criteriaRes = await supabase
+      .from('pf_criteria_types')
+      .select('criteria_id, criteria:pf_criteria(label)')
+      .eq('evaluation_type', ev.type)
+      .eq('active', true)
+      .order('sort_order')
+
+    if (criteriaRes.error) {
+      console.error('[EvaluationPublic] criteria error:', criteriaRes.error)
+      setPageState('invalid'); return
+    }
+
     setEvaluation(ev)
-    setCriteria(criteriaRes.data ?? [])
+    setCriteria((criteriaRes.data ?? []).map(r => {
+      const c = Array.isArray(r.criteria) ? r.criteria[0] : r.criteria
+      return { id: r.criteria_id, label: c?.label ?? '' }
+    }))
     setScores(Object.fromEntries((ev.answers ?? []).map(a => [a.criteria_id, a.score])))
     setNotes(ev.notes ?? '')
     setPageState('form')

@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Settings2, ListChecks, ShieldAlert, User, Check, Network } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
 import { useDepartments } from '../hooks/useDepartments'
-import { DEPARTMENT_AREAS } from '../lib/constants'
+import { DEPARTMENT_AREAS, PROTECTED_CRITERIA_COUNT } from '../lib/constants'
 import CriteriaSettings from '../components/settings/CriteriaSettings'
+import CriteriaByTypeSettings from '../components/settings/CriteriaByTypeSettings'
 import GeneralSettings from '../components/settings/GeneralSettings'
 import RelationsPanel from '../components/settings/RelationsPanel'
 
@@ -69,6 +70,8 @@ function ProfileSection({ user, onSave }) {
 export default function Settings() {
   const { user, updateDisplayName } = useAuth()
   const [criteria, setCriteria]     = useState([])
+  const [criteriaTypes, setCriteriaTypes] = useState([])
+  const [usedCriteriaIds, setUsedCriteriaIds] = useState(new Set())
   const [settings, setSettings]     = useState({})
   const [departmentRelations, setDepartmentRelations] = useState([])
   const [teamRelations, setTeamRelations] = useState([])
@@ -76,21 +79,45 @@ export default function Settings() {
   const [loadError, setLoadError]   = useState('')
   const { departments } = useDepartments()
 
-  const load = async () => {
+  // Fetches criteria + their per-type associations + which criteria were ever used in a cycle.
+  // Returns the first error (or null) so callers decide how to surface it.
+  const loadCriteria = useCallback(async () => {
+    const [cRes, tRes, uRes] = await Promise.all([
+      supabase.from('pf_criteria').select('*').order('sort_order'),
+      supabase.from('pf_criteria_types').select('criteria_id, evaluation_type, active, sort_order'),
+      supabase.from('pf_cycle_criteria').select('criteria_id'),
+    ])
+    const err = cRes.error ?? tRes.error ?? uRes.error
+    if (err) return err
+    setCriteria(cRes.data ?? [])
+    setCriteriaTypes(tRes.data ?? [])
+    setUsedCriteriaIds(new Set((uRes.data ?? []).map(r => r.criteria_id)))
+    return null
+  }, [])
+
+  const mutateCriteria = async (...queries) => {
+    for (const q of queries) {
+      const { error } = await q
+      if (error) throw error
+    }
+    const err = await loadCriteria()
+    if (err) throw err
+  }
+
+  const load = useCallback(async () => {
     setLoading(true)
     setLoadError('')
-    const [criteriaRes, settingsRes, deptRelRes, teamRelRes] = await Promise.all([
-      supabase.from('pf_criteria').select('*').order('sort_order'),
+    const [criteriaErr, settingsRes, deptRelRes, teamRelRes] = await Promise.all([
+      loadCriteria(),
       supabase.from('pf_settings').select('*'),
       supabase.from('pf_department_relations').select('id, department_a_id, department_b_id, department_a:pf_departments!department_a_id(name), department_b:pf_departments!department_b_id(name)'),
       supabase.from('pf_team_relations').select('id, team_a_id, team_b_id, team_a:pf_teams!team_a_id(name), team_b:pf_teams!team_b_id(name)'),
     ])
-    if (criteriaRes.error || settingsRes.error || deptRelRes.error || teamRelRes.error) {
-      setLoadError(criteriaRes.error?.message ?? settingsRes.error?.message ?? deptRelRes.error?.message ?? teamRelRes.error?.message)
+    if (criteriaErr || settingsRes.error || deptRelRes.error || teamRelRes.error) {
+      setLoadError(criteriaErr?.message ?? settingsRes.error?.message ?? deptRelRes.error?.message ?? teamRelRes.error?.message)
       setLoading(false)
       return
     }
-    setCriteria(criteriaRes.data ?? [])
     const map = Object.fromEntries((settingsRes.data ?? []).map(s => [s.key, s.value]))
     setSettings(map)
     setDepartmentRelations((deptRelRes.data ?? []).map(r => ({
@@ -102,9 +129,9 @@ export default function Settings() {
       bId: r.team_b_id, bLabel: r.team_b?.name ?? '—',
     })))
     setLoading(false)
-  }
+  }, [loadCriteria])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
 
   const handleUpdateLabel = async (id, label) => {
     const { error } = await supabase.from('pf_criteria').update({ label }).eq('id', id)
@@ -112,15 +139,63 @@ export default function Settings() {
     setCriteria(prev => prev.map(c => c.id === id ? { ...c, label } : c))
   }
 
-  const handleReorder = async (newOrder) => {
-    const updates = newOrder.map((c, i) =>
-      supabase.from('pf_criteria').update({ sort_order: i + 1 }).eq('id', c.id)
-    )
-    const results = await Promise.all(updates)
-    const err = results.find(r => r.error)?.error
-    if (err) throw err
-    setCriteria(newOrder.map((c, i) => ({ ...c, sort_order: i + 1 })))
+  // Deactivating cascades to every type association; reactivating restores them all.
+  const handleToggleCriterion = (id, active) => mutateCriteria(
+    supabase.from('pf_criteria').update({ active }).eq('id', id),
+    supabase.from('pf_criteria_types').update({ active }).eq('criteria_id', id),
+  )
+
+  const handleDeleteCriterion = (id) => mutateCriteria(
+    supabase.from('pf_criteria_types').delete().eq('criteria_id', id),
+    supabase.from('pf_criteria').delete().eq('id', id),
+  )
+
+  const handleAddCriterion = async (label, types) => {
+    const maxOrder = Math.max(0, ...criteria.map(c => c.sort_order ?? 0))
+    const { data, error } = await supabase
+      .from('pf_criteria').insert({ label, active: true, sort_order: maxOrder + 1 }).select().single()
+    if (error) throw error
+    const rows = types.map(evaluation_type => ({
+      criteria_id: data.id,
+      evaluation_type,
+      active: true,
+      sort_order: Math.max(0, ...criteriaTypes.filter(r => r.evaluation_type === evaluation_type).map(r => r.sort_order ?? 0)) + 1,
+    }))
+    await mutateCriteria(supabase.from('pf_criteria_types').insert(rows))
   }
+
+  const handleReorderType = (type, orderedIds) => mutateCriteria(
+    ...orderedIds.map((id, i) =>
+      supabase.from('pf_criteria_types').update({ sort_order: i + 1 }).eq('criteria_id', id).eq('evaluation_type', type)
+    )
+  )
+
+  const handleAddToType = (type, criteriaId) => {
+    const existing = criteriaTypes.find(r => r.criteria_id === criteriaId && r.evaluation_type === type)
+    if (existing) {
+      // inactive leftover row: reactivate instead of inserting a duplicate
+      return mutateCriteria(
+        supabase.from('pf_criteria_types').update({ active: true }).eq('criteria_id', criteriaId).eq('evaluation_type', type)
+      )
+    }
+    const sort_order = Math.max(0, ...criteriaTypes.filter(r => r.evaluation_type === type).map(r => r.sort_order ?? 0)) + 1
+    return mutateCriteria(
+      supabase.from('pf_criteria_types').insert({ criteria_id: criteriaId, evaluation_type: type, active: true, sort_order })
+    )
+  }
+
+  // Past/running cycles keep their pf_cycle_criteria snapshot, so deleting the association is safe.
+  const handleRemoveFromType = (type, criteriaId) => mutateCriteria(
+    supabase.from('pf_criteria_types').delete().eq('criteria_id', criteriaId).eq('evaluation_type', type)
+  )
+
+  // The 8 seeded criteria are the earliest created; they can never be deleted.
+  const protectedCriteriaIds = new Set(
+    [...criteria]
+      .sort((a, b) => String(a.created_at ?? '').localeCompare(String(b.created_at ?? '')))
+      .slice(0, PROTECTED_CRITERIA_COUNT)
+      .map(c => c.id)
+  )
 
   const [activeTab, setActiveTab] = useState('perfil')
 
@@ -291,6 +366,33 @@ export default function Settings() {
         .st-action-btn:hover:not(:disabled) { background: var(--color-border); color: var(--color-text); }
         .st-action-btn:disabled { opacity: 0.3; cursor: not-allowed; }
         .st-action-confirm:hover:not(:disabled) { background: rgba(34,197,94,0.12); color: #16a34a; }
+
+        .st-action-danger:hover:not(:disabled) { background: rgba(220,60,60,0.08); color: #e05252; }
+
+        .st-toggle {
+          width: 38px;
+          height: 22px;
+          border-radius: 11px;
+          background: var(--color-border);
+          position: relative;
+          flex-shrink: 0;
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+        .st-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
+        .st-toggle-on { background: var(--color-accent); }
+        .st-toggle-knob {
+          position: absolute;
+          top: 3px;
+          left: 3px;
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background: #fff;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+          transition: transform 0.2s;
+        }
+        .st-toggle-on .st-toggle-knob { transform: translateX(16px); }
 
         .st-edit-input {
           flex: 1;
@@ -515,11 +617,11 @@ export default function Settings() {
               <div>
                 <div className="st-section-title">Critérios de Avaliação</div>
                 <div className="st-section-desc">
-                  Edita os labels e reordena conforme necessário.
+                  Gere os critérios e a sua associação a cada tipo de avaliação.
                 </div>
                 <div className="st-brc-notice">
                   <ShieldAlert size={11} />
-                  Requisito BRC — critérios não podem ser eliminados
+                  Requisito BRC — os 8 critérios base não podem ser eliminados
                 </div>
               </div>
             </div>
@@ -527,11 +629,24 @@ export default function Settings() {
             {loading ? (
               <div className="st-skeleton" style={{ height: 8 * 50 }} />
             ) : (
-              <CriteriaSettings
-                criteria={criteria}
-                onUpdateLabel={handleUpdateLabel}
-                onReorder={handleReorder}
-              />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+                <CriteriaSettings
+                  criteria={criteria}
+                  protectedIds={protectedCriteriaIds}
+                  usedIds={usedCriteriaIds}
+                  onUpdateLabel={handleUpdateLabel}
+                  onToggleActive={handleToggleCriterion}
+                  onDelete={handleDeleteCriterion}
+                  onAdd={handleAddCriterion}
+                />
+                <CriteriaByTypeSettings
+                  criteria={criteria}
+                  criteriaTypes={criteriaTypes}
+                  onReorder={handleReorderType}
+                  onAddToType={handleAddToType}
+                  onRemoveFromType={handleRemoveFromType}
+                />
+              </div>
             )}
           </div>
         )}

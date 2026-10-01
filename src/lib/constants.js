@@ -78,6 +78,9 @@ export const DEPARTMENT_AREA_LABELS = {
   producao: 'Produção',
 }
 
+// The seeded base criteria (DEFAULT_CRITERIA) can never be deleted (BRC requirement)
+export const PROTECTED_CRITERIA_COUNT = 8
+
 export const DEFAULT_CRITERIA = [
   { key: 'responsibility', label: 'Responsabilidade' },
   { key: 'adaptability', label: 'Adaptação e Flexibilidade' },

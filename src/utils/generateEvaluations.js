@@ -4,7 +4,30 @@ import { buildRelationLookup } from './relationLookup'
 
 export { buildRelationLookup }
 
+// Snapshot of active criteria per evaluation type, so later edits in Settings
+// don't affect cycles that already started. Idempotent: inserts only missing rows.
+async function snapshotCycleCriteria(cycleId) {
+  const [typesRes, existingRes] = await Promise.all([
+    supabase.from('pf_criteria_types').select('criteria_id, evaluation_type').eq('active', true),
+    supabase.from('pf_cycle_criteria').select('criteria_id, evaluation_type').eq('cycle_id', cycleId),
+  ])
+  if (typesRes.error) throw typesRes.error
+  if (existingRes.error) throw existingRes.error
+
+  const key = r => `${r.criteria_id}|${r.evaluation_type}`
+  const existing = new Set((existingRes.data ?? []).map(key))
+  const rows = (typesRes.data ?? [])
+    .filter(r => !existing.has(key(r)))
+    .map(r => ({ cycle_id: cycleId, criteria_id: r.criteria_id, evaluation_type: r.evaluation_type }))
+  if (!rows.length) return
+
+  const { error } = await supabase.from('pf_cycle_criteria').insert(rows)
+  if (error) throw error
+}
+
 export async function generateEvaluationsForCycle(cycleId) {
+  await snapshotCycleCriteria(cycleId)
+
   const [empResult, settingResult, evaluator0072Result, cycleResult, teamRelResult, deptRelResult] = await Promise.all([
     supabase.from('pf_employees').select('id, employee_number, manager_id, team_id, department_id, department:pf_departments(area)').eq('status', 'active'),
     supabase.from('pf_settings').select('value').eq('key', 'peer_evaluator_limit').single(),
