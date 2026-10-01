@@ -18,6 +18,8 @@ export default function EvaluationPublic() {
   const [criteria, setCriteria]     = useState([])
   const [scores, setScores]         = useState({})
   const [criteriaNotes, setCriteriaNotes] = useState({})
+  const [na, setNa]                 = useState({}) // criteria_id -> true when marked N/A
+  const [missingNote, setMissingNote] = useState(null) // criteria_id highlighted after a blocked submit
   const [notes, setNotes]           = useState('')
   const [saving, setSaving]         = useState(false)
   const [submitError, setSubmitError] = useState('')
@@ -72,7 +74,8 @@ export default function EvaluationPublic() {
       const c = Array.isArray(r.criteria) ? r.criteria[0] : r.criteria
       return { id: r.criteria_id, label: c?.label ?? '' }
     }))
-    setScores(Object.fromEntries((ev.answers ?? []).map(a => [a.criteria_id, a.score])))
+    setScores(Object.fromEntries((ev.answers ?? []).filter(a => a.score != null).map(a => [a.criteria_id, a.score])))
+    setNa(Object.fromEntries((ev.answers ?? []).filter(a => a.score == null).map(a => [a.criteria_id, true])))
     setCriteriaNotes(Object.fromEntries((ev.answers ?? []).filter(a => a.notes).map(a => [a.criteria_id, a.notes])))
     setNotes(ev.notes ?? '')
     setPageState('form')
@@ -82,18 +85,24 @@ export default function EvaluationPublic() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    const filled = criteria.map(c => scores[c.id]).filter(Boolean)
-    if (filled.length < criteria.length) {
+    if (answered < criteria.length) {
       setSubmitError('Preenche todos os critérios antes de submeter.')
       return
     }
+    const missing = criteria.find(c => na[c.id] && !criteriaNotes[c.id]?.trim())
+    if (missing) {
+      setMissingNote(missing.id)
+      setSubmitError(`Indica a observação obrigatória para N/A no critério "${missing.label}".`)
+      return
+    }
+    setMissingNote(null)
     setSaving(true)
     setSubmitError('')
 
-    const answers = Object.entries(scores).map(([criteria_id, score]) => ({
-      criteria_id,
-      score: Number(score),
-      notes: criteriaNotes[criteria_id]?.trim() || null,
+    const answers = criteria.map(c => ({
+      criteria_id: c.id,
+      score: na[c.id] ? null : Number(scores[c.id]),
+      notes: criteriaNotes[c.id]?.trim() || null,
     }))
 
     const { error } = await supabase.rpc('submit_evaluation', {
@@ -110,10 +119,11 @@ export default function EvaluationPublic() {
   const evaluatee = evaluation ? (Array.isArray(evaluation.evaluatee) ? evaluation.evaluatee[0] : evaluation.evaluatee) : null
 
   const scoreValues = criteria.map(c => scores[c.id]).filter(Boolean)
+  const answered = criteria.filter(c => scores[c.id] || na[c.id]).length
   const avg = scoreValues.length
     ? (scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length).toFixed(1)
     : null
-  const progress = criteria.length > 0 ? scoreValues.length / criteria.length : 0
+  const progress = criteria.length > 0 ? answered / criteria.length : 0
 
   return (
     <>
@@ -245,6 +255,26 @@ export default function EvaluationPublic() {
           box-shadow: 0 2px 10px rgba(224,203,75,0.25);
         }
         .pub-cr-btn:active { transform: scale(0.96); }
+
+        .pub-na-btn {
+          flex: 0 0 auto;
+          align-self: flex-start;
+          height: 28px;
+          padding: 0 12px;
+          border-radius: 8px;
+          border: 1.5px solid var(--color-border);
+          background: var(--color-bg);
+          color: var(--color-text-muted);
+          font-size: 11px;
+          font-weight: 700;
+          font-family: inherit;
+          cursor: pointer;
+        }
+        .pub-na-btn.selected {
+          background: var(--color-text-muted);
+          border-color: var(--color-text-muted);
+          color: var(--color-bg);
+        }
 
         .pub-cr-num {
           font-size: 15px;
@@ -502,7 +532,7 @@ export default function EvaluationPublic() {
                   <div className="pub-progress-label">
                     <span className="pub-section-label" style={{ marginBottom: 0 }}>Critérios de avaliação</span>
                     <span className="pub-progress-count">
-                      {scoreValues.length}/{criteria.length}
+                      {answered}/{criteria.length}
                     </span>
                   </div>
                   <div className="pub-progress">
@@ -518,7 +548,10 @@ export default function EvaluationPublic() {
                             key={n}
                             type="button"
                             className={`pub-cr-btn${scores[c.id] === n ? ' selected' : ''}`}
-                            onClick={() => setScores(s => ({ ...s, [c.id]: n }))}
+                            onClick={() => {
+                              setScores(s => ({ ...s, [c.id]: n }))
+                              setNa(x => ({ ...x, [c.id]: false }))
+                            }}
                             title={SCORE_LABELS[n]}
                           >
                             <span className="pub-cr-num">{n}</span>
@@ -526,12 +559,26 @@ export default function EvaluationPublic() {
                           </button>
                         ))}
                       </div>
+                      <button
+                        type="button"
+                        className={`pub-na-btn${na[c.id] ? ' selected' : ''}`}
+                        aria-pressed={!!na[c.id]}
+                        onClick={() => {
+                          setNa(x => ({ ...x, [c.id]: !x[c.id] }))
+                          setScores(s => ({ ...s, [c.id]: null }))
+                        }}
+                      >
+                        N/A
+                      </button>
                       <textarea
                         className="pub-textarea"
-                        style={{ flex: '1 1 100%', fontSize: 13, padding: '8px 11px' }}
+                        style={{
+                          flex: '1 1 100%', fontSize: 13, padding: '8px 11px',
+                          ...(na[c.id] && { borderColor: missingNote === c.id || !criteriaNotes[c.id]?.trim() ? '#e05252' : undefined }),
+                        }}
                         value={criteriaNotes[c.id] ?? ''}
                         onChange={e => setCriteriaNotes(n => ({ ...n, [c.id]: e.target.value }))}
-                        placeholder="Observação (opcional)"
+                        placeholder={na[c.id] ? 'Observação obrigatória (N/A)' : 'Observação (opcional)'}
                         rows={1}
                         autoComplete="off"
                       />
@@ -573,13 +620,13 @@ export default function EvaluationPublic() {
                   <button
                     type="submit"
                     className="pub-submit-btn"
-                    disabled={saving || scoreValues.length < criteria.length}
+                    disabled={saving || answered < criteria.length}
                   >
                     {saving ? 'A submeter…' : 'Submeter Avaliação'}
                   </button>
-                  {scoreValues.length < criteria.length && (
+                  {answered < criteria.length && (
                     <span style={{ fontSize: 12, color: 'var(--color-text-muted)', textAlign: 'center' }}>
-                      Faltam {criteria.length - scoreValues.length} critério{criteria.length - scoreValues.length !== 1 ? 's' : ''}
+                      Faltam {criteria.length - answered} critério{criteria.length - answered !== 1 ? 's' : ''}
                     </span>
                   )}
                 </div>

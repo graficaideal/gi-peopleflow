@@ -16,7 +16,7 @@ export default function CycleNotesModal({ cycle, onClose }) {
       .from('pf_evaluations')
       .select(`
         id, type, notes${evaluatorCol},
-        answers:pf_evaluation_answers(notes, criteria:pf_criteria(label, sort_order)),
+        answers:pf_evaluation_answers(score, notes, criteria:pf_criteria(label, sort_order)),
         evaluatee:pf_employees!evaluatee_id(id, full_name, department:pf_departments(id, name))
       `)
       .eq('cycle_id', cycle.id)
@@ -27,7 +27,7 @@ export default function CycleNotesModal({ cycle, onClose }) {
           ...e,
           notes: e.notes?.trim() || null,
           criteriaNotes: (e.answers ?? [])
-            .map(a => ({ note: a.notes?.trim(), criteria: Array.isArray(a.criteria) ? a.criteria[0] : a.criteria }))
+            .map(a => ({ note: a.notes?.trim(), na: a.score == null, criteria: Array.isArray(a.criteria) ? a.criteria[0] : a.criteria }))
             .filter(a => a.note)
             .sort((a, b) => (a.criteria?.sort_order ?? 0) - (b.criteria?.sort_order ?? 0)),
         }))
@@ -98,7 +98,7 @@ export default function CycleNotesModal({ cycle, onClose }) {
                       )}
                       {n.criteriaNotes.map((cn, i) => (
                         <div key={i} style={{ fontSize: 13, color: 'var(--color-text)', whiteSpace: 'pre-wrap', marginTop: 4 }}>
-                          <span style={{ fontWeight: 600, color: 'var(--color-text-muted)' }}>{cn.criteria?.label ?? '—'}: </span>
+                          <span style={{ fontWeight: 600, color: 'var(--color-text-muted)' }}>{cn.criteria?.label ?? '—'}{cn.na ? ' (N/A)' : ''}: </span>
                           {cn.note}
                         </div>
                       ))}

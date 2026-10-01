@@ -1,13 +1,15 @@
 import { SCORE_LABELS } from '../../lib/constants'
 import ScoreDisplay from './ScoreDisplay'
 
-export default function CriteriaRow({ criterion, score, onChange, readonly = false, note }) {
+export default function CriteriaRow({ criterion, score, onChange, readonly = false, note, na = false }) {
   return (
     <div className="cr-row" style={note ? { flexWrap: 'wrap' } : undefined}>
       <div className="cr-label">{criterion.label}</div>
       {readonly ? (
         <div style={{ flexShrink: 0, minWidth: 100, textAlign: 'right' }}>
-          <ScoreDisplay score={score} />
+          {na
+            ? <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text-muted)' }}>N/A</span>
+            : <ScoreDisplay score={score} />}
         </div>
       ) : (
         <div className="cr-scores">
