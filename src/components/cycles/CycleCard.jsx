@@ -4,7 +4,7 @@ import CycleStatusBadge from './CycleStatusBadge'
 import CycleTypeBadge from './CycleTypeBadge'
 import { formatDate } from '../../utils/formatters'
 
-export default function CycleCard({ cycle, onEdit, onDelete, onActivate, onCloseCycle }) {
+export default function CycleCard({ cycle, onEdit, onDelete, onActivate, onCloseCycle, onViewNotes }) {
   const isActive = cycle.status === 'active'
   const isDraft  = cycle.status === 'draft'
 
@@ -34,6 +34,11 @@ export default function CycleCard({ cycle, onEdit, onDelete, onActivate, onClose
         <div className="cy-card-right">
           <CycleStatusBadge status={cycle.status} />
           <div className="cy-card-actions">
+            {cycle.status !== 'draft' && (
+              <button className="cy-action-btn" style={{ width: 'auto', padding: '0 9px', fontSize: 12, fontWeight: 500 }} onClick={() => onViewNotes(cycle)}>
+                Ver Observações
+              </button>
+            )}
             {isDraft && (
               <Link className="cy-action-btn" to={`/cycles/${cycle.id}/simulate`} title="Simular ciclo">
                 <FlaskConical size={13} />

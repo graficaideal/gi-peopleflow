@@ -41,7 +41,19 @@ function buildHistory(evaluations) {
     const globalAvg = allScores.length
       ? (allScores.reduce((a, b) => a + b, 0) / allScores.length).toFixed(1)
       : null
-    return { cycle, avgByType, globalAvg }
+    const notes = evals
+      .filter(e => e.notes?.trim())
+      .map(e => {
+        const evaluator = Array.isArray(e.evaluator) ? e.evaluator[0] : e.evaluator
+        return {
+          id: e.id,
+          type: e.type,
+          text: e.notes.trim(),
+          // never expose the evaluator in anonymous cycles
+          evaluatorName: cycle.anonymous ? null : evaluator?.full_name ?? null,
+        }
+      })
+    return { cycle, avgByType, globalAvg, notes }
   }).sort((a, b) => {
     const da = a.cycle.end_date ?? ''
     const db = b.cycle.end_date ?? ''
@@ -111,8 +123,9 @@ export default function EmployeeDetail() {
     const { data } = await supabase
       .from('pf_evaluations')
       .select(`
-        id, type,
-        cycle:pf_evaluation_cycles(id, name, type, end_date),
+        id, type, notes,
+        cycle:pf_evaluation_cycles(id, name, type, end_date, anonymous),
+        evaluator:pf_employees!evaluator_id(full_name),
         answers:pf_evaluation_answers(score)
       `)
       .eq('evaluatee_id', id)
@@ -357,6 +370,22 @@ export default function EmployeeDetail() {
             font-size: 11px;
             font-weight: 500;
           }
+          .eh-notes {
+            padding: 14px 18px;
+            border-top: 1px solid var(--color-border);
+          }
+          .eh-note { margin-top: 10px; }
+          .eh-note-meta {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--color-text-muted);
+            margin-bottom: 2px;
+          }
+          .eh-note-text {
+            font-size: 13px;
+            color: var(--color-text);
+            white-space: pre-wrap;
+          }
           .eh-empty {
             padding: 36px 18px;
             text-align: center;
@@ -383,7 +412,7 @@ export default function EmployeeDetail() {
           <div className="eh-card">
             <div className="eh-empty">Sem avaliações submetidas para este colaborador.</div>
           </div>
-        ) : history.map(({ cycle, avgByType, globalAvg }) => (
+        ) : history.map(({ cycle, avgByType, globalAvg, notes }) => (
           <div key={cycle.id} className="eh-card">
             <div className="eh-card-header">
               <span className="eh-cycle-name">{cycle.name}</span>
@@ -426,6 +455,20 @@ export default function EmployeeDetail() {
                 )}
               </div>
             </div>
+            {notes.length > 0 && (
+              <div className="eh-notes">
+                <div className="eh-score-label">Observações</div>
+                {notes.map(n => (
+                  <div key={n.id} className="eh-note">
+                    <div className="eh-note-meta">
+                      {EVALUATION_TYPE_LABELS[n.type] ?? n.type}
+                      {n.evaluatorName && ` · ${n.evaluatorName}`}
+                    </div>
+                    <div className="eh-note-text">{n.text}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>

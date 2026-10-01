@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient'
 import { useCycles } from '../hooks/useCycles'
 import CycleCard from '../components/cycles/CycleCard'
 import CycleForm from '../components/cycles/CycleForm'
+import CycleNotesModal from '../components/cycles/CycleNotesModal'
 
 const STATUS_FILTERS = [
   { value: 'all',    label: 'Todos' },
@@ -19,7 +20,8 @@ export default function Cycles() {
   const [cycleModal, setCycleModal]   = useState(null)  // null | { mode, cycle }
   const [deleteModal, setDeleteModal] = useState(null)  // null | { cycle }
   const [confirmModal, setConfirmModal] = useState(null) // null | { type: 'activate'|'close', cycle }
-  const [deleting, setDeleting]       = useState(false)
+  const [notesCycle, setNotesCycle] = useState(null)
+  const [deleting, setDeleting]      = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [acting, setActing]           = useState(false)
   const [actError, setActError]       = useState('')
@@ -483,11 +485,14 @@ export default function Cycles() {
                 onDelete={c => { setDeleteError(''); setDeleteModal({ cycle: c }) }}
                 onActivate={c => { setActError(''); setConfirmModal({ type: 'activate', cycle: c }) }}
                 onCloseCycle={c => { setActError(''); setConfirmModal({ type: 'close', cycle: c }) }}
+                onViewNotes={setNotesCycle}
               />
             ))}
           </div>
         )}
       </div>
+
+      {notesCycle && <CycleNotesModal cycle={notesCycle} onClose={() => setNotesCycle(null)} />}
 
       {/* Create / Edit modal */}
       {cycleModal && (
