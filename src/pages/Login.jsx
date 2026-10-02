@@ -141,9 +141,9 @@ export default function Login() {
         }}>
 
           <img
-            src="/logo.svg"
+            src="/logo_amarelo.png"
             alt="GI"
-            style={{ width: 44, height: 'auto', display: 'block', margin: '0 auto 24px' }}
+            style={{ width: 96, height: 'auto', display: 'block', margin: '0 auto 24px' }}
           />
 
           <h1 style={{

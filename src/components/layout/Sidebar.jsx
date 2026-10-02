@@ -17,9 +17,9 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       <img
-        src="/logo.svg"
+        src="/logo_amarelo.png"
         alt="GI"
-        style={{ width: 32, height: 'auto', marginBottom: 20, flexShrink: 0 }}
+        style={{ width: 40, height: 'auto', marginBottom: 20, flexShrink: 0 }}
       />
 
       <nav className="sidebar-nav">
