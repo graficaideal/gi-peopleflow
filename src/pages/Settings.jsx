@@ -150,10 +150,23 @@ export default function Settings() {
     supabase.from('pf_criteria').delete().eq('id', id),
   )
 
+  // "Comunicação & Equipa" -> "comunicacao_equipa"; suffixes _2, _3… on collision.
+  // ponytail: uniqueness checked against loaded state only; the DB UNIQUE constraint still guards races.
+  const generateCriterionKey = (label) => {
+    const base = label.normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'criterio'
+    const taken = new Set(criteria.map(c => c.key))
+    let key = base
+    for (let n = 2; taken.has(key); n++) key = `${base}_${n}`
+    return key
+  }
+
   const handleAddCriterion = async (label, types) => {
     const maxOrder = Math.max(0, ...criteria.map(c => c.sort_order ?? 0))
     const { data, error } = await supabase
-      .from('pf_criteria').insert({ label, active: true, sort_order: maxOrder + 1 }).select().single()
+      .from('pf_criteria')
+      .insert({ key: generateCriterionKey(label), label, active: true, sort_order: maxOrder + 1 })
+      .select().single()
     if (error) throw error
     const rows = types.map(evaluation_type => ({
       criteria_id: data.id,
