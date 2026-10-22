@@ -936,3 +936,6 @@ input, textarea, select { font-family: inherit; }
 .rp-obs-meta { font-size: 11px; font-weight: 600; color: var(--color-text-muted); margin-bottom: 2px; }
 .rp-obs-text { font-size: 13px; color: var(--color-text); white-space: pre-wrap; margin-top: 2px; }
 .rp-obs-label { font-weight: 600; color: var(--color-text-muted); }
+/* Fixed layout so the average columns keep equal widths; long text is truncated */
+.rp-table-fixed { table-layout: fixed; min-width: 860px; }
+.rp-table-fixed th, .rp-table-fixed td { overflow: hidden; text-overflow: ellipsis; }

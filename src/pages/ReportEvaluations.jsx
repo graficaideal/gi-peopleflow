@@ -90,7 +90,8 @@ export default function ReportEvaluations() {
             ...report.types.map(t => formatAvg(report.footer.byType[t], '-')),
           ]],
           columnStyles: Object.fromEntries(
-            columns.map((_, i) => [i, i >= 4 ? { halign: 'right', cellWidth: 22 } : {}])
+            // average columns share one fixed width; Média Global (index 4) in bold
+            columns.map((_, i) => [i, i >= 4 ? { halign: 'right', cellWidth: 22, ...(i === 4 && { fontStyle: 'bold' }) } : {}])
           ),
         },
       })
@@ -141,7 +142,12 @@ export default function ReportEvaluations() {
           <div className="rp-empty">Sem colaboradores ativos.</div>
         ) : (
           <div className="rp-table-wrap">
-            <table className="rp-table">
+            <table className="rp-table rp-table-fixed">
+              <colgroup>
+                <col style={{ width: '6%' }} />
+                <col /><col /><col />
+                {columns.slice(4).map(c => <col key={c} style={{ width: '9%' }} />)}
+              </colgroup>
               <thead>
                 <tr>{columns.map((c, i) => <th key={c} className={i >= 4 ? 'rp-num' : undefined}>{c}</th>)}</tr>
               </thead>
@@ -152,10 +158,10 @@ export default function ReportEvaluations() {
                 {visibleRows.map(r => (
                   <tr key={r.employee.id}>
                     <td>{r.employee.employee_number}</td>
-                    <td>{r.employee.full_name}</td>
-                    <td>{r.department ?? '—'}</td>
-                    <td>{r.team ?? '—'}</td>
-                    <td className="rp-num" style={{ fontWeight: 600 }}>{formatAvg(r.global)}</td>
+                    <td title={r.employee.full_name}>{r.employee.full_name}</td>
+                    <td title={r.department ?? undefined}>{r.department ?? '—'}</td>
+                    <td title={r.team ?? undefined}>{r.team ?? '—'}</td>
+                    <td className="rp-num" style={{ fontWeight: 700 }}>{formatAvg(r.global)}</td>
                     {report.types.map(t => <td key={t} className="rp-num">{formatAvg(r.byType[t])}</td>)}
                   </tr>
                 ))}
