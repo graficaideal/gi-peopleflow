@@ -4,7 +4,7 @@ import { ArrowLeft, FileDown } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useCycles } from '../hooks/useCycles'
 import { useDepartments } from '../hooks/useDepartments'
-import { EVALUATION_TYPE_LABELS } from '../lib/constants'
+import { CYCLE_STATUSES, EVALUATION_TYPE_LABELS } from '../lib/constants'
 import { fetchAll, withObservations, groupByEvaluatee } from '../utils/reports'
 import { exportReportPdf, pdfFilename } from '../utils/reportPdf'
 
@@ -15,7 +15,9 @@ const observationLines = n => [
 ]
 
 export default function ReportObservations() {
-  const { cycles, loading: cyclesLoading } = useCycles()
+  const { cycles: allCycles, loading: cyclesLoading } = useCycles()
+  // Reports only cover finalized cycles
+  const cycles = allCycles.filter(c => c.status === CYCLE_STATUSES.CLOSED)
   const { departments } = useDepartments()
   const [cycleId, setCycleId] = useState('')
   const [deptId, setDeptId]   = useState('')
@@ -111,7 +113,7 @@ export default function ReportObservations() {
 
       <div className="rp-filters">
         <select className="rp-select" value={cycleId} onChange={e => setCycleId(e.target.value)} disabled={cyclesLoading}>
-          <option value="">{cyclesLoading ? 'A carregar ciclos…' : 'Selecionar ciclo…'}</option>
+          <option value="">{cyclesLoading ? 'A carregar ciclos…' : cycles.length ? 'Selecionar ciclo…' : 'Sem ciclos finalizados'}</option>
           {cycles.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         <select className="rp-select" value={deptId} onChange={e => setDeptId(e.target.value)}>
