@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Users, ClipboardList, RefreshCcw,
-  Building2, Settings
+  Building2, FileBarChart, Settings
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: '/evaluations', icon: ClipboardList, label: 'Avaliações' },
   { to: '/cycles', icon: RefreshCcw, label: 'Ciclos' },
   { to: '/departments', icon: Building2, label: 'Departamentos' },
+  { to: '/reports', icon: FileBarChart, label: 'Reports' },
   { to: '/settings', icon: Settings, label: 'Definições' },
 ]
 

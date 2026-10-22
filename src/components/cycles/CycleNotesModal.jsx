@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { X } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import { EVALUATION_TYPE_LABELS } from '../../lib/constants'
+import { withObservations, groupByEvaluatee } from '../../utils/reports'
 
 // Reuses the cy-* modal/input styles defined in pages/Cycles.jsx
 export default function CycleNotesModal({ cycle, onClose }) {
@@ -23,15 +24,7 @@ export default function CycleNotesModal({ cycle, onClose }) {
       .eq('status', 'submitted')
       .then(({ data, error }) => {
         if (error) { setError(error.message); setRows([]); return }
-        const withNotes = (data ?? []).map(e => ({
-          ...e,
-          notes: e.notes?.trim() || null,
-          criteriaNotes: (e.answers ?? [])
-            .map(a => ({ note: a.notes?.trim(), na: a.score == null, criteria: Array.isArray(a.criteria) ? a.criteria[0] : a.criteria }))
-            .filter(a => a.note)
-            .sort((a, b) => (a.criteria?.sort_order ?? 0) - (b.criteria?.sort_order ?? 0)),
-        }))
-        setRows(withNotes.filter(e => e.notes || e.criteriaNotes.length))
+        setRows(withObservations(data ?? []))
       })
   }, [cycle.id, cycle.anonymous])
 
@@ -41,17 +34,10 @@ export default function CycleNotesModal({ cycle, onClose }) {
     return [...map].sort((a, b) => a[1].localeCompare(b[1]))
   }, [rows])
 
-  const groups = useMemo(() => {
-    const byEmp = new Map()
-    ;(rows ?? [])
-      .filter(r => dept === 'all' || r.evaluatee?.department?.id === dept)
-      .forEach(r => {
-        const e = r.evaluatee
-        if (!byEmp.has(e?.id)) byEmp.set(e?.id, { name: e?.full_name ?? '—', notes: [] })
-        byEmp.get(e?.id).notes.push(r)
-      })
-    return [...byEmp.values()].sort((a, b) => a.name.localeCompare(b.name))
-  }, [rows, dept])
+  const groups = useMemo(() =>
+    groupByEvaluatee((rows ?? []).filter(r => dept === 'all' || r.evaluatee?.department?.id === dept)),
+    [rows, dept]
+  )
 
   return (
     <div className="cy-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -84,7 +70,7 @@ export default function CycleNotesModal({ cycle, onClose }) {
               )}
 
               {groups.map(g => (
-                <div key={g.name}>
+                <div key={g.id ?? g.name}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 6 }}>{g.name}</div>
                   {g.notes.map(n => (
                     <div key={n.id} style={{ marginBottom: 10, paddingLeft: 10, borderLeft: '2px solid var(--color-border)' }}>
