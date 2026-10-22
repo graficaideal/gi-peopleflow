@@ -4,7 +4,7 @@ import { ArrowLeft, FileDown } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useCycles } from '../hooks/useCycles'
 import { EVALUATION_TYPES, EVALUATION_TYPE_SHORT_LABELS } from '../lib/constants'
-import { buildEvaluationReport, fetchAll, formatAvg } from '../utils/reports'
+import { buildEvaluationReport, fetchAll, formatAvg, normalizeSearch } from '../utils/reports'
 import { exportReportPdf, pdfFilename } from '../utils/reportPdf'
 
 const TYPE_ORDER = Object.values(EVALUATION_TYPES)
@@ -17,8 +17,18 @@ export default function ReportEvaluations() {
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
   const [exporting, setExporting] = useState(false)
+  const [search, setSearch]     = useState('')
 
   const cycle = cycles.find(c => c.id === cycleId)
+
+  // Screen-only filter: footer and PDF always cover the whole cycle.
+  const visibleRows = useMemo(() => {
+    const q = normalizeSearch(search)
+    if (!report || !q) return report?.rows ?? []
+    return report.rows.filter(r =>
+      normalizeSearch(r.employee.full_name).includes(q) ||
+      normalizeSearch(r.employee.employee_number).includes(q))
+  }, [report, search])
 
   useEffect(() => {
     if (!cycleId) { setReport(null); return }
@@ -108,6 +118,14 @@ export default function ReportEvaluations() {
           <option value="">{cyclesLoading ? 'A carregar ciclos…' : 'Selecionar ciclo…'}</option>
           {cycles.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
+        <input
+          type="search"
+          className="rp-select rp-search"
+          placeholder="Pesquisar por nome ou nº…"
+          aria-label="Pesquisar colaborador"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
       </div>
 
       {error && <div className="rp-error">{error}</div>}
@@ -126,7 +144,10 @@ export default function ReportEvaluations() {
                 <tr>{columns.map((c, i) => <th key={c} className={i >= 4 ? 'rp-num' : undefined}>{c}</th>)}</tr>
               </thead>
               <tbody>
-                {report.rows.map(r => (
+                {visibleRows.length === 0 && (
+                  <tr><td colSpan={columns.length} className="rp-empty">Nenhum colaborador corresponde à pesquisa.</td></tr>
+                )}
+                {visibleRows.map(r => (
                   <tr key={r.employee.id}>
                     <td>{r.employee.employee_number}</td>
                     <td>{r.employee.full_name}</td>

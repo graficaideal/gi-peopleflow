@@ -4,7 +4,10 @@ const one = v => (Array.isArray(v) ? v[0] : v)
 const mean = xs => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null)
 const byName = (a, b) => (a ?? '').localeCompare(b ?? '', 'pt')
 
-export const formatAvg = (v, empty = '—') => (v == null ? empty : v.toFixed(1))
+// Case- and accent-insensitive ('joao' matches 'João')
+export const normalizeSearch = s => (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+
+export const formatAvg =(v, empty = '—') => (v == null ? empty : v.toFixed(1))
 
 // PostgREST caps each response at 1000 rows: page until a short page comes back.
 // makeQuery must return a fresh, stably ordered query builder on every call.
@@ -43,11 +46,8 @@ export function buildEvaluationReport(employees, evaluations, typeOrder) {
         byType: Object.fromEntries(types.map(t => [t, mean(byType[t] ?? [])])),
       }
     })
-    .sort((a, b) =>
-      // employees without department go last
-      (a.department == null) - (b.department == null) ||
-      byName(a.department, b.department) ||
-      byName(a.employee.full_name, b.employee.full_name))
+    // employee_number is TEXT: numeric collation so '10' sorts after '9'
+    .sort((a, b) => (a.employee.employee_number ?? '').localeCompare(b.employee.employee_number ?? '', 'pt', { numeric: true }))
 
   const colMean = pick => mean(rows.map(pick).filter(v => v != null))
   const footer = {

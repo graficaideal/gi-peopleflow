@@ -907,6 +907,7 @@ input, textarea, select { font-family: inherit; }
   border: 1px solid var(--color-border); border-radius: 8px;
   background: var(--color-surface); color: var(--color-text); font-size: 13px; cursor: pointer; outline: none;
 }
+.rp-search { cursor: text; }
 .rp-select:focus { border-color: var(--color-accent); box-shadow: 0 0 0 3px rgba(224,203,75,0.1); }
 .rp-btn {
   height: 36px; padding: 0 14px; border-radius: 7px; font-size: 13px; font-weight: 600; flex-shrink: 0;

@@ -1,11 +1,13 @@
 // ponytail: sanity check for the report aggregations, no framework needed.
 // Run with: node src/utils/reports.selfcheck.js
 import assert from 'node:assert/strict'
-import { buildEvaluationReport, withObservations, groupByEvaluatee, fetchAll } from './reports.js'
+import { buildEvaluationReport, withObservations, groupByEvaluatee, fetchAll, normalizeSearch } from './reports.js'
+
+assert.equal(normalizeSearch('  João CONCEIÇÃO '), 'joao conceicao', 'normalizeSearch strips accents/case')
 
 const TYPES = ['self', 'peer', 'manager', 'general', 'subordinate']
-const emp = (id, full_name, dept, team) => ({
-  id, full_name, employee_number: id,
+const emp = (id, full_name, dept, team, employee_number = id) => ({
+  id, full_name, employee_number,
   department: dept ? { name: dept } : null,
   team: team ? { name: team } : null,
 })
@@ -16,7 +18,7 @@ const ev = (evaluatee_id, type, status, scores) => ({
 // --- Test A: averages pool scores, skip N/A, ignore non-submitted ------------------
 {
   const { types, rows, footer } = buildEvaluationReport(
-    [emp('1', 'Zé', 'Produção'), emp('2', 'Ana', 'Produção'), emp('3', 'Rui', null), emp('4', 'Bia', 'Adm')],
+    [emp('1', 'Zé', 'Produção', null, '10'), emp('2', 'Ana', 'Produção', null, '9'), emp('3', 'Rui', null), emp('4', 'Bia', 'Adm', null, '100')],
     [
       ev('1', 'self', 'submitted', [5, 3, null]),   // self 4
       ev('1', 'peer', 'submitted', [2]),            // peer 2 -> global (5+3+2)/3
@@ -27,7 +29,7 @@ const ev = (evaluatee_id, type, status, scores) => ({
     TYPES,
   )
   assert.deepEqual(types, ['self', 'peer', 'manager'], 'A: types present (non-cancelled), in order')
-  assert.deepEqual(rows.map(r => r.employee.full_name), ['Bia', 'Ana', 'Zé', 'Rui'], 'A: dept then name, no dept last')
+  assert.deepEqual(rows.map(r => r.employee.employee_number), ['3', '9', '10', '100'], 'A: numeric employee_number order')
   const ze = rows.find(r => r.employee.id === '1')
   assert.equal(ze.byType.self, 4, 'A: self avg skips N/A')
   assert.equal(ze.byType.peer, 2, 'A: pending peer ignored')
