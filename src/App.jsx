@@ -13,6 +13,9 @@ import Cycles from './pages/Cycles'
 import CycleSimulation from './pages/CycleSimulation'
 import Departments from './pages/Departments'
 import Settings from './pages/Settings'
+import Reports from './pages/Reports'
+import ReportEvaluations from './pages/ReportEvaluations'
+import ReportObservations from './pages/ReportObservations'
 import NotFound from './pages/NotFound'
 import EvaluationPublic from './pages/EvaluationPublic'
 import { useAuth } from './hooks/useAuth'
@@ -44,6 +47,9 @@ export default function App() {
               <Route path="cycles" element={<Cycles />} />
               <Route path="cycles/:id/simulate" element={<CycleSimulation />} />
               <Route path="departments" element={<Departments />} />
+              <Route path="reports" element={<Reports />} />
+              <Route path="reports/evaluations" element={<ReportEvaluations />} />
+              <Route path="reports/observations" element={<ReportObservations />} />
               <Route path="settings" element={<Settings />} />
             </Route>
             <Route path="/avaliar/:token" element={<EvaluationPublic />} />

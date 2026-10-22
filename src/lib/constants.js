@@ -14,6 +14,15 @@ export const EVALUATION_TYPE_LABELS = {
   subordinate: 'Avaliação por Subordinado',
 }
 
+// Short labels for table column headers (reports)
+export const EVALUATION_TYPE_SHORT_LABELS = {
+  self: 'Auto',
+  peer: 'Colega',
+  manager: 'Chefia',
+  general: 'Geral',
+  subordinate: 'Subordinado',
+}
+
 export const CYCLE_TYPES = {
   QUARTERLY: 'quarterly',
   SEMI_ANNUAL: 'semi_annual',
