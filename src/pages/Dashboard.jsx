@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Users, ClipboardList, RefreshCw, BarChart2,
-  ChevronRight, CheckCircle2, Calendar,
+  ChevronRight, CheckCircle2, Calendar, Gauge,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
 import { EvaluationTypeBadge } from '../components/evaluations/EvaluationBadge'
 import { formatCycleType, formatDate } from '../utils/formatters'
 import { SCORE_LABELS } from '../lib/constants'
+import { formatAvg } from '../utils/reports'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -24,7 +25,8 @@ function today() {
   return new Date().toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
-function calcDistribution(evals) {
+// One average per evaluatee, pooling every answered score across their evaluations.
+function evaluateeAverages(evals) {
   const byEvaluatee = {}
   evals.forEach(ev => {
     const scores = (ev.answers ?? []).map(a => a.score).filter(Boolean)
@@ -32,10 +34,17 @@ function calcDistribution(evals) {
     if (!byEvaluatee[ev.evaluatee_id]) byEvaluatee[ev.evaluatee_id] = []
     byEvaluatee[ev.evaluatee_id].push(...scores)
   })
+  return Object.values(byEvaluatee).map(scores => scores.reduce((a, b) => a + b, 0) / scores.length)
+}
 
+// Mean of the per-employee averages: every employee weighs the same.
+function globalAverage(averages) {
+  return averages.length ? averages.reduce((a, b) => a + b, 0) / averages.length : null
+}
+
+function calcDistribution(averages) {
   const dist = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
-  Object.values(byEvaluatee).forEach(scores => {
-    const avg = scores.reduce((a, b) => a + b, 0) / scores.length
+  averages.forEach(avg => {
     const bucket = Math.min(5, Math.max(1, Math.round(avg)))
     dist[bucket]++
   })
@@ -124,6 +133,7 @@ export default function Dashboard() {
 
       let cycleProgress = { total: 0, submitted: 0 }
       let distribution = null
+      let globalAvg = null
 
       if (phase2.length) {
         const p2 = await Promise.all(phase2)
@@ -132,7 +142,9 @@ export default function Dashboard() {
           cycleProgress = { total: p2[i++].count ?? 0, submitted: p2[i++].count ?? 0 }
         }
         if (closedC) {
-          distribution = calcDistribution(p2[i].data ?? [])
+          const averages = evaluateeAverages(p2[i].data ?? [])
+          distribution = calcDistribution(averages)
+          globalAvg = globalAverage(averages)
         }
       }
 
@@ -140,7 +152,7 @@ export default function Dashboard() {
         activeEmployees: empRes.count ?? 0,
         pendingCount: pendRes.count ?? 0,
         activeCycle: activeC ? { ...activeC, ...cycleProgress } : null,
-        closedCycle: closedC ? { ...closedC, distribution } : null,
+        closedCycle: closedC ? { ...closedC, distribution, globalAvg } : null,
         pendingEvaluations: pendEvRes.data ?? [],
       })
       setLoading(false)
@@ -169,11 +181,12 @@ export default function Dashboard() {
         /* ── Stat cards ── */
         .db-stats {
           display: grid;
-          grid-template-columns: repeat(4, 1fr);
+          grid-template-columns: repeat(5, 1fr);
           gap: 12px;
           margin-bottom: 28px;
         }
-        @media (max-width: 900px) { .db-stats { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 1100px) { .db-stats { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 700px) { .db-stats { grid-template-columns: repeat(2, 1fr); } }
 
         .db-stat {
           background: var(--color-surface);
@@ -420,7 +433,7 @@ export default function Dashboard() {
         {/* Stats */}
         {loading ? (
           <div className="db-stats" style={{ marginBottom: 28 }}>
-            {[1, 2, 3, 4].map((i, idx) => (
+            {[1, 2, 3, 4, 5].map((i, idx) => (
               <div key={i} className="db-skel" style={{ height: 110, animationDelay: `${idx * 0.05}s` }} />
             ))}
           </div>
@@ -499,6 +512,31 @@ export default function Dashboard() {
                 <>
                   <div className="db-stat-value" style={{ fontSize: 15, color: 'var(--color-text-muted)' }}>—</div>
                   <div className="db-stat-label">Sem ciclos fechados</div>
+                </>
+              )}
+            </div>
+
+            {/* Global average of the last closed cycle (mean of per-employee averages) */}
+            <div className="db-stat" style={{ animationDelay: '0.2s' }}>
+              <div className="db-stat-icon" style={{ background: 'rgba(20,150,160,0.1)', color: '#0e9aa7' }}>
+                <Gauge size={17} />
+              </div>
+              {closedCycle?.globalAvg != null ? (
+                <>
+                  <div className="db-stat-value" style={{ color: barColor(Math.round(closedCycle.globalAvg)) }}>
+                    {formatAvg(closedCycle.globalAvg)}
+                    <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-muted)', letterSpacing: 0 }}> / 5</span>
+                  </div>
+                  <div className="db-stat-label">Média global</div>
+                  <div className="db-stat-sub" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {closedCycle.name}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="db-stat-value" style={{ fontSize: 15, color: 'var(--color-text-muted)' }}>—</div>
+                  <div className="db-stat-label">Média global</div>
+                  <div className="db-stat-sub">Sem dados de ciclo fechado</div>
                 </>
               )}
             </div>
