@@ -10,6 +10,13 @@ export const formatDate = (dateStr) => {
   return new Date(dateStr).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
+export const formatDateTime = (dateStr) =>
+  new Date(dateStr).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+
+// 3.8 -> "3,8"
+export const formatDecimal = (n) =>
+  Number(n).toLocaleString('pt-PT', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+
 export const calcAverage = (scores) => {
   const valid = Object.values(scores).filter(v => typeof v === 'number' && v > 0)
   if (!valid.length) return null

@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
-import { Pencil, Trash2 } from 'lucide-react'
-import { scoreToLabel } from '../../utils/formatters'
+import { Pencil, Trash2, Mail } from 'lucide-react'
+import { scoreToLabel, formatDecimal, formatDateTime } from '../../utils/formatters'
 
 const STATUS_CONFIG = {
   active:        { label: 'Ativo',         cls: 'active' },
@@ -20,7 +20,16 @@ function scoreColor(avg) {
   return '#16a34a'
 }
 
-export default function EmployeeTable({ employees, lastEvalScores = {}, onEdit, onDelete }) {
+function scoreEmailState(emp, scoreEmail) {
+  const sentAt = scoreEmail?.sent?.[emp.id]
+  if (sentAt) return { sent: true, title: `Enviado a ${formatDateTime(sentAt)}` }
+  if (!scoreEmail?.cycleId) return { disabled: true, title: 'Não existe nenhum ciclo fechado' }
+  if (!emp.email) return { disabled: true, title: 'Sem email definido na ficha do colaborador' }
+  if (!scoreEmail.scored.has(emp.id)) return { disabled: true, title: 'Sem avaliações submetidas no último ciclo fechado' }
+  return { title: 'Enviar média da última avaliação' }
+}
+
+export default function EmployeeTable({ employees, lastEvalScores = {}, scoreEmail, onEdit, onDelete, onSendScoreEmail }) {
   const navigate = useNavigate()
 
   return (
@@ -35,13 +44,14 @@ export default function EmployeeTable({ employees, lastEvalScores = {}, onEdit, 
             <th>Equipa</th>
             <th>Estado</th>
             <th>Última Avaliação</th>
-            <th style={{ width: 72 }} />
+            <th style={{ width: 104 }} />
           </tr>
         </thead>
         <tbody>
           {employees.map((emp, i) => {
             const cfg = STATUS_CONFIG[emp.status] ?? STATUS_CONFIG.inactive
             const avg = lastEvalScores[emp.id] ?? null   // { avg, inProgress } | null
+            const mail = scoreEmailState(emp, scoreEmail)
             return (
               <tr
                 key={emp.id}
@@ -67,7 +77,7 @@ export default function EmployeeTable({ employees, lastEvalScores = {}, onEdit, 
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4 }}>
                         <span style={{ fontSize: 15, fontWeight: 700, color: scoreColor(avg.avg), lineHeight: 1 }}>
-                          {avg.avg}
+                          {formatDecimal(avg.avg)}
                         </span>
                         <span style={{ fontSize: 11, fontWeight: 600, color: scoreColor(avg.avg) }}>
                           {scoreToLabel(avg.avg)}
@@ -90,20 +100,30 @@ export default function EmployeeTable({ employees, lastEvalScores = {}, onEdit, 
                   )}
                 </td>
                 <td onClick={e => e.stopPropagation()}>
-                  <div className="emp-row-actions">
+                  <div className="emp-actions-cell">
+                    <div className="emp-row-actions">
+                      <button
+                        className="ui-action-btn"
+                        onClick={() => onEdit(emp)}
+                        title="Editar"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        className="ui-action-btn danger"
+                        onClick={() => onDelete(emp)}
+                        title="Apagar"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                     <button
-                      className="ui-action-btn"
-                      onClick={() => onEdit(emp)}
-                      title="Editar"
+                      className={`ui-action-btn emp-mail-btn${mail.sent ? ' sent' : ''}`}
+                      onClick={() => onSendScoreEmail(emp)}
+                      disabled={mail.disabled}
+                      title={mail.title}
                     >
-                      <Pencil size={13} />
-                    </button>
-                    <button
-                      className="ui-action-btn danger"
-                      onClick={() => onDelete(emp)}
-                      title="Apagar"
-                    >
-                      <Trash2 size={13} />
+                      <Mail size={13} />
                     </button>
                   </div>
                 </td>
