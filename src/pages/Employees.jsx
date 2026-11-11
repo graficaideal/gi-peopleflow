@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Plus, Users, Search, X, Download } from 'lucide-react'
+import { Plus, Users, Search, X, Download, Mail } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabaseClient'
 import { useEmployees } from '../hooks/useEmployees'
 import { EMPLOYEE_STATUS_LABELS } from '../lib/constants'
 import EmployeeTable from '../components/employees/EmployeeTable'
 import EmployeeForm from '../components/employees/EmployeeForm'
+import { formatDateTime } from '../utils/formatters'
 
 function calcEvalScores(evaluations, activeCycleId, closedCycleMap) {
   const byEvaluatee = {}
@@ -14,7 +15,7 @@ function calcEvalScores(evaluations, activeCycleId, closedCycleMap) {
     byEvaluatee[ev.evaluatee_id].push(ev)
   })
 
-  const avg = scores => (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
+  const avg = scores => Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10
 
   const result = {}
   for (const [empId, evals] of Object.entries(byEvaluatee)) {
@@ -56,6 +57,13 @@ const STATUS_FILTERS = [
 export default function Employees() {
   const { employees, loading, error, createEmployee, updateEmployee, deleteEmployee } = useEmployees()
   const [lastEvalScores, setLastEvalScores] = useState({})
+  // Score email for the most recent closed cycle
+  const [lastClosedCycleId, setLastClosedCycleId] = useState(null)
+  const [scoredInLastClosed, setScoredInLastClosed] = useState(new Set()) // employee ids with submitted scores
+  const [scoreEmailsSent, setScoreEmailsSent] = useState({})              // employee_id -> sent_at
+  const [scoreEmailModal, setScoreEmailModal] = useState(null)            // null | employee
+  const [scoreEmailBusy, setScoreEmailBusy] = useState(false)
+  const [scoreEmailError, setScoreEmailError] = useState('')
 
   useEffect(() => {
     const loadScores = async () => {
@@ -70,6 +78,16 @@ export default function Employees() {
 
       if (!cycleIds.length) return
 
+      const lastClosed = [...closedCycles].sort((a, b) => (b.end_date ?? '').localeCompare(a.end_date ?? ''))[0]
+      if (lastClosed) {
+        setLastClosedCycleId(lastClosed.id)
+        const { data: sent } = await supabase
+          .from('pf_score_notifications')
+          .select('employee_id, sent_at')
+          .eq('cycle_id', lastClosed.id)
+        setScoreEmailsSent(Object.fromEntries((sent ?? []).map(n => [n.employee_id, n.sent_at])))
+      }
+
       const { data: evals } = await supabase
         .from('pf_evaluations')
         .select('evaluatee_id, cycle_id, answers:pf_evaluation_answers(score)')
@@ -77,6 +95,12 @@ export default function Employees() {
         .eq('status', 'submitted')
 
       if (!evals?.length) return
+
+      if (lastClosed) {
+        setScoredInLastClosed(new Set(evals
+          .filter(e => e.cycle_id === lastClosed.id && e.answers?.some(a => a.score))
+          .map(e => e.evaluatee_id)))
+      }
 
       const closedCycleMap = Object.fromEntries(closedCycles.map(c => [c.id, c]))
       setLastEvalScores(calcEvalScores(evals, activeCycleId, closedCycleMap))
@@ -129,6 +153,24 @@ export default function Employees() {
     const mm = String(today.getMonth() + 1).padStart(2, '0')
     const yyyy = today.getFullYear()
     XLSX.writeFile(book, `colaboradores_${dd}-${mm}-${yyyy}.xlsx`)
+  }
+
+  const handleScoreEmailConfirm = async () => {
+    setScoreEmailBusy(true)
+    setScoreEmailError('')
+    const { data, error: err } = await supabase.functions.invoke('send-score-email', {
+      body: { employee_id: scoreEmailModal.id },
+    })
+    if (err || data?.error) {
+      // invoke() wraps non-2xx responses; the function's message lives in the response body
+      const body = await err?.context?.json?.().catch(() => null)
+      setScoreEmailError(data?.error ?? body?.error ?? err?.message ?? 'Erro no envio')
+      setScoreEmailBusy(false)
+      return
+    }
+    setScoreEmailsSent(prev => ({ ...prev, [scoreEmailModal.id]: data.sent_at }))
+    setScoreEmailBusy(false)
+    setScoreEmailModal(null)
   }
 
   const handleDeleteConfirm = async () => {
@@ -230,6 +272,8 @@ export default function Employees() {
         <EmployeeTable
           employees={filtered}
           lastEvalScores={lastEvalScores}
+          scoreEmail={{ cycleId: lastClosedCycleId, scored: scoredInLastClosed, sent: scoreEmailsSent }}
+          onSendScoreEmail={emp => { setScoreEmailError(''); setScoreEmailModal(emp) }}
           onEdit={emp => setEmpModal({ mode: 'edit', emp })}
           onDelete={emp => { setDeleteError(''); setDeleteModal({ id: emp.id, name: emp.full_name }) }}
         />
@@ -249,6 +293,41 @@ export default function Employees() {
           }
           onClose={() => setEmpModal(null)}
         />
+      )}
+
+      {/* Score email confirmation */}
+      {scoreEmailModal && (
+        <div
+          className="ui-modal-overlay"
+          onClick={e => e.target === e.currentTarget && !scoreEmailBusy && setScoreEmailModal(null)}
+        >
+          <div className="ui-modal" style={{ maxWidth: 400 }}>
+            <div className="ui-modal-header">
+              <span className="ui-modal-title">Enviar resultado da avaliação</span>
+              <button className="ui-modal-close" onClick={() => setScoreEmailModal(null)} disabled={scoreEmailBusy}>
+                <X size={15} />
+              </button>
+            </div>
+            <div className="ui-modal-body">
+              <p style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.6 }}>
+                Enviar a <strong>{scoreEmailModal.full_name}</strong> ({scoreEmailModal.email}) a média global do último ciclo fechado?
+              </p>
+              {scoreEmailsSent[scoreEmailModal.id] && (
+                <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 8 }}>
+                  Já foi enviado a {formatDateTime(scoreEmailsSent[scoreEmailModal.id])}. Será enviado novamente.
+                </p>
+              )}
+              {scoreEmailError && <p className="ui-error">{scoreEmailError}</p>}
+            </div>
+            <div className="ui-modal-footer">
+              <button className="ui-btn secondary" onClick={() => setScoreEmailModal(null)} disabled={scoreEmailBusy}>Cancelar</button>
+              <button className="ui-btn primary" onClick={handleScoreEmailConfirm} disabled={scoreEmailBusy}>
+                <Mail size={14} />
+                {scoreEmailBusy ? 'A enviar…' : 'Enviar'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Delete confirmation */}

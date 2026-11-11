@@ -735,6 +735,12 @@ input, textarea, select { font-family: inherit; }
   justify-content: flex-end;
 }
 .emp-row:hover .emp-row-actions { opacity: 1; }
+/* Score email: always visible (status at a glance), grey until sent, then green */
+.emp-actions-cell { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
+.emp-mail-btn.sent { color: #16a34a; }
+.emp-mail-btn.sent:hover { background: rgba(22,163,74,0.1); color: #16a34a; }
+.emp-mail-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.emp-mail-btn:disabled:hover { background: none; color: var(--color-text-muted); }
 
 /* ── Employees — status badge ──────────────────────────── */
 .emp-status {
